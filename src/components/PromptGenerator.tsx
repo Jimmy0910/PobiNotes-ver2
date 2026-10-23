@@ -600,18 +600,9 @@ export default function PromptGenerator({
 
       {/* Explicit Image-Only Warning Banner (Requirement 9) */}
       {imageDiagnostics.withImageMistakes.length > 0 && (
-        <div style={{
-          padding: '14px 18px',
-          borderRadius: 'var(--radius-md)',
-          background: 'rgba(245, 158, 11, 0.12)',
-          border: '1px solid rgba(245, 158, 11, 0.4)',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px',
-          color: '#fbbf24'
-        }} data-testid="image-only-warning-banner">
-          <AlertTriangle size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div style={{ fontSize: '0.86rem', lineHeight: 1.55 }}>
+        <div className="warning-alert-banner animate-fade-in" data-testid="image-only-warning-banner">
+          <AlertTriangle size={20} />
+          <div style={{ fontSize: '0.86rem', lineHeight: 1.6 }}>
             <strong>圖片內容未包含於純文字提詞提醒：</strong>
             <span>
               您目前勾選的錯題中，有 {imageDiagnostics.withImageMistakes.length} 題包含圖片
@@ -644,19 +635,12 @@ export default function PromptGenerator({
                       style={{
                         padding: '6px 12px',
                         fontSize: '0.82rem',
-                        border: !isSelected && tpl.isRecommended ? '1px solid #f59e0b' : undefined
+                        border: !isSelected && tpl.isRecommended ? '1px solid var(--warning-border)' : undefined
                       }}
                       data-testid={`prompt-tpl-btn-${tpl.name}`}
                     >
                       {tpl.isRecommended && (
-                        <span style={{
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          background: isSelected ? '#fbbf24' : 'rgba(245, 158, 11, 0.2)',
-                          color: isSelected ? '#0f172a' : '#fbbf24'
-                        }}>
+                        <span className="badge-recommended-tag">
                           最推薦
                         </span>
                       )}
@@ -806,7 +790,7 @@ export default function PromptGenerator({
                       <div style={{ fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         <span>{m.title}</span>
                         {ext.isImageOnlyQuestion && (
-                          <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24' }}>
+                          <span className="badge-warning-contrast">
                             純圖片題
                           </span>
                         )}

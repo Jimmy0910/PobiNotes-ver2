@@ -908,14 +908,8 @@ export default function MistakeList({
                       {(m.error_reason_names || []).map(rn => (
                         <span
                           key={rn}
-                          style={{
-                            fontSize: '0.75rem',
-                            color: '#fbbf24',
-                            background: 'rgba(245, 158, 11, 0.12)',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(245, 158, 11, 0.3)'
-                          }}
+                          className="badge-warning-contrast"
+                          style={{ fontSize: '0.75rem', padding: '2px 8px' }}
                         >
                           錯因：{rn}
                         </span>

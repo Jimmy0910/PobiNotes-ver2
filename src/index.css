@@ -36,7 +36,10 @@
   --success-glow: rgba(25, 122, 39, 0.16);
   --danger: #B91C1C;
   --danger-glow: rgba(185, 28, 28, 0.14);
-  --warning: #B45309;             /* 溫暖赭黃/焦糖，避免淺色底看不清 */
+  --warning: #92400E;             /* 溫暖赭黃/焦糖，高對比易讀 (WCAG AAA) */
+  --warning-bg: #FEF3C7;
+  --warning-border: #D97706;
+  --warning-text: #78350F;
   --warning-glow: rgba(180, 83, 9, 0.14);
   
   --shadow-sm: 0 1px 3px rgba(0, 31, 101, 0.05);
@@ -85,6 +88,9 @@
   --danger: #EF4444;
   --danger-glow: rgba(239, 68, 68, 0.25);
   --warning: #FBBF24;
+  --warning-bg: rgba(245, 158, 11, 0.16);
+  --warning-border: rgba(251, 191, 36, 0.5);
+  --warning-text: #FDE68A;
   --warning-glow: rgba(251, 191, 36, 0.25);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
@@ -1027,4 +1033,54 @@ select optgroup {
   .sidebar-expanded {
     width: 300px;
   }
+}
+
+/* High Contrast Warning Alert Banner & Tags (WCAG AAA Compliant in Light & Dark Modes) */
+.warning-alert-banner {
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--warning-bg);
+  border: 1.5px solid var(--warning-border);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--warning-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.warning-alert-banner svg {
+  color: var(--warning-border);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.warning-alert-banner strong {
+  color: var(--warning-text);
+  font-weight: 700;
+}
+
+.badge-warning-contrast {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  display: inline-block;
+}
+
+.badge-recommended-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #D97706;
+  color: #FFFFFF;
+  display: inline-block;
+}
+
+[data-theme="dark"] .badge-recommended-tag {
+  background: #FBBF24;
+  color: #0F172A;
 }

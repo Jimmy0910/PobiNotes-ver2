@@ -1061,7 +1061,7 @@ export default function Dashboard({
               刪除章節「{deleteChapterTarget.name}」
             </h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              此章節目前關聯了 <strong style={{ color: '#fbbf24' }}>{deleteChapterTarget.mistakeCount} 道錯題</strong>。請選擇刪除章節時的錯題處理方式：
+              此章節目前關聯了 <strong style={{ color: 'var(--warning)' }}>{deleteChapterTarget.mistakeCount} 道錯題</strong>。請選擇刪除章節時的錯題處理方式：
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
