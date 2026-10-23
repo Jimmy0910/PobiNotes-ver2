@@ -150,6 +150,55 @@ export async function ensureSchemaAndUserDefaults(db: D1Database, userId?: strin
 
   // 4. Seed initial user categories & migrate legacy mastery values if needed
   if (userId) {
+    // Auto deduplicate and merge duplicate categories for this user (e.g. repeated familiarity or error reasons)
+    try {
+      const userCats = await db.prepare(
+        `SELECT id, user_id, dimension, parent_id, name, created_at FROM categories WHERE user_id = ? ORDER BY created_at ASC`
+      ).bind(userId).all();
+
+      const catMap = new Map<string, any[]>();
+      for (const c of (userCats.results || []) as any[]) {
+        const key = `${c.dimension}:::${c.parent_id || ''}:::${c.name}`;
+        if (!catMap.has(key)) catMap.set(key, []);
+        catMap.get(key)!.push(c);
+      }
+
+      for (const [, items] of catMap.entries()) {
+        if (items.length > 1) {
+          const canonical = items[0];
+          const duplicates = items.slice(1);
+          for (const dup of duplicates) {
+            if (canonical.dimension === 'familiarity') {
+              await db.prepare(
+                `UPDATE mistakes SET familiarity_id = ? WHERE user_id = ? AND familiarity_id = ?`
+              ).bind(canonical.id, userId, dup.id).run();
+            } else if (canonical.dimension === 'unit') {
+              await db.prepare(
+                `UPDATE mistakes SET unit_id = ? WHERE user_id = ? AND unit_id = ?`
+              ).bind(canonical.id, userId, dup.id).run();
+            } else if (canonical.dimension === 'error_reason') {
+              const affectedMistakes = await db.prepare(
+                `SELECT id, error_reason_ids FROM mistakes WHERE user_id = ? AND error_reason_ids LIKE ?`
+              ).bind(userId, `%${dup.id}%`).all();
+              for (const m of (affectedMistakes.results || []) as any[]) {
+                try {
+                  let ids: string[] = JSON.parse(m.error_reason_ids || '[]');
+                  ids = ids.map(id => (id === dup.id ? canonical.id : id));
+                  ids = Array.from(new Set(ids));
+                  await db.prepare(
+                    `UPDATE mistakes SET error_reason_ids = ? WHERE id = ?`
+                  ).bind(JSON.stringify(ids), m.id).run();
+                } catch {}
+              }
+            }
+            await db.prepare(`DELETE FROM categories WHERE id = ?`).bind(dup.id).run();
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error during categories deduplication:', e);
+    }
+
     const settings = await db.prepare(`SELECT * FROM user_settings WHERE user_id = ?`).bind(userId).first() as any;
     if (!settings || !settings.categories_seeded) {
       const now = Date.now();

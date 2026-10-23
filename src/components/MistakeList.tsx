@@ -6,7 +6,6 @@ import {
   type FieldOption,
   type MistakeRecord,
   formatPct,
-  getEffectiveFamiliarityId,
   getEffectiveFamiliarityName
 } from '../types';
 import {
@@ -66,10 +65,14 @@ export default function MistakeList({
   const [showEditor, setShowEditor] = useState(false);
   const [editingMistake, setEditingMistake] = useState<MistakeRecord | null>(null);
 
-  // Filter states
+  // Filter states (Requirements: 日期/科目/單元/錯因/熟悉度，科目與單元下拉選單，錯因選全科/單科/特定章節，熟悉度僅一組)
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [excludedFamIds, setExcludedFamIds] = useState<string[]>([]);
+  const [filterSubjectId, setFilterSubjectId] = useState<string>('');
+  const [filterUnitId, setFilterUnitId] = useState<string>('');
+  const [filterErrorScope, setFilterErrorScope] = useState<'all' | 'global' | 'subject' | 'chapter'>('all');
+  const [filterErrorReasonId, setFilterErrorReasonId] = useState<string>('');
+  const [excludedFamNames, setExcludedFamNames] = useState<string[]>([]);
   const [onlyUncategorized, setOnlyUncategorized] = useState(false);
 
   // Beginner onboarding guide banner state
@@ -182,26 +185,132 @@ export default function MistakeList({
     }
   };
 
-  const toggleFamiliarityExclusion = (famId: string, checked: boolean) => {
-    setExcludedFamIds(prev => {
+  const toggleFamiliarityNameExclusion = (name: string, checked: boolean) => {
+    setExcludedFamNames(prev => {
       if (checked) {
-        return prev.filter(id => id !== famId);
+        return prev.filter(n => n !== name);
       } else {
-        return prev.includes(famId) ? prev : [...prev, famId];
+        return prev.includes(name) ? prev : [...prev, name];
       }
     });
   };
 
-  const activeFamiliarities = useMemo(
-    () => categories.familiarities.filter(f => f.is_active === 1),
-    [categories.familiarities]
+  // Deduplicated familiarities: guaranteed exactly ONE entry per name (順, 卡, 不會, 誤解)
+  const deduplicatedFamiliarities = useMemo(() => {
+    const active = categories.familiarities.filter(f => f.is_active === 1);
+    const map = new Map<string, { id: string; name: string; color: string; ids: string[] }>();
+    const orderMap: Record<string, number> = { '順': 1, '卡': 2, '不會': 3, '誤解': 4 };
+
+    for (const f of active) {
+      if (!map.has(f.name)) {
+        map.set(f.name, {
+          id: f.id,
+          name: f.name,
+          color: f.color,
+          ids: [f.id]
+        });
+      } else {
+        map.get(f.name)!.ids.push(f.id);
+      }
+    }
+
+    // Ensure all 4 standard familiarities exist
+    const standardDefaults = [
+      { name: '順', color: 'success' },
+      { name: '卡', color: 'warning' },
+      { name: '不會', color: 'danger' },
+      { name: '誤解', color: 'danger' }
+    ];
+    for (const def of standardDefaults) {
+      if (!map.has(def.name)) {
+        map.set(def.name, { id: def.name, name: def.name, color: def.color, ids: [def.name] });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      const ordA = orderMap[a.name] ?? 99;
+      const ordB = orderMap[b.name] ?? 99;
+      return ordA - ordB;
+    });
+  }, [categories.familiarities]);
+
+  const activeSubjects = useMemo(
+    () => categories.subjects.filter(s => s.is_active === 1),
+    [categories.subjects]
   );
 
-  // Units belonging to the currently selected chapter (Requirement 4)
+  // Units belonging to the currently selected chapter or for dropdown filter
   const chapterUnits = useMemo(() => {
     if (!chapterId) return [];
     return categories.units.filter(u => u.parent_id === chapterId && u.is_active === 1);
   }, [categories.units, chapterId]);
+
+  // Available units for the search dropdown (filtered by selected subject if chosen)
+  const availableFilterUnits = useMemo(() => {
+    const subjectChapterIds = filterSubjectId
+      ? new Set(categories.chapters.filter(c => c.parent_id === filterSubjectId).map(c => c.id))
+      : null;
+
+    const filtered = categories.units.filter(u => {
+      if (u.is_active !== 1) return false;
+      if (subjectChapterIds && (!u.parent_id || !subjectChapterIds.has(u.parent_id))) {
+        return false;
+      }
+      return true;
+    });
+
+    const chapterMap = new Map(categories.chapters.map(c => [c.id, c.name]));
+    return filtered.map(u => {
+      const chapName = u.parent_id ? chapterMap.get(u.parent_id) : null;
+      return {
+        id: u.id,
+        name: u.name,
+        label: chapName ? `${chapName} ➔ ${u.name}` : u.name
+      };
+    });
+  }, [categories.units, categories.chapters, filterSubjectId]);
+
+  // Available error reasons for the search dropdown (filtered by chosen scope)
+  const availableFilterErrorReasons = useMemo(() => {
+    const active = categories.errorReasons.filter(r => r.is_active === 1);
+    let list = active;
+    if (filterErrorScope === 'global') {
+      list = active.filter(r => !r.parent_id);
+    } else if (filterErrorScope === 'subject') {
+      const subjectIds = new Set(categories.subjects.map(s => s.id));
+      list = active.filter(r => r.parent_id && subjectIds.has(r.parent_id));
+      if (filterSubjectId) {
+        list = list.filter(r => r.parent_id === filterSubjectId);
+      }
+    } else if (filterErrorScope === 'chapter') {
+      const chapterIds = new Set(categories.chapters.map(c => c.id));
+      list = active.filter(r => r.parent_id && chapterIds.has(r.parent_id));
+    }
+
+    // Deduplicate by name
+    const seen = new Set<string>();
+    return list.filter(r => {
+      if (seen.has(r.name)) return false;
+      seen.add(r.name);
+      return true;
+    });
+  }, [categories.errorReasons, categories.subjects, categories.chapters, filterErrorScope, filterSubjectId]);
+
+  const hasActiveFilters = Boolean(
+    fromDate || toDate || filterSubjectId || filterUnitId || filterErrorReasonId || filterErrorScope !== 'all' || excludedFamNames.length > 0 || searchQuery
+  );
+
+  const handleResetAllFilters = () => {
+    setSearchQuery('');
+    setFromDate('');
+    setToDate('');
+    setFilterSubjectId('');
+    setFilterUnitId('');
+    setFilterErrorScope('all');
+    setFilterErrorReasonId('');
+    setExcludedFamNames([]);
+    setOnlyUncategorized(false);
+  };
 
   const filteredMistakes = useMemo(() => {
     return mistakes.filter(m => {
@@ -228,15 +337,71 @@ export default function MistakeList({
       if (fromDate && mDate < fromDate) return false;
       if (toDate && mDate > toDate) return false;
 
-      // 3. Familiarity Filter
-      const fId = getEffectiveFamiliarityId(m, categories.familiarities);
-      if (fId && excludedFamIds.includes(fId)) {
+      // 3. Subject Filter Dropdown
+      if (filterSubjectId) {
+        const mSubId = m.subject_id || (m.chapter_id ? categories.chapters.find(c => c.id === m.chapter_id)?.parent_id : null);
+        if (mSubId !== filterSubjectId) return false;
+      }
+
+      // 4. Unit Filter Dropdown
+      if (filterUnitId) {
+        if (m.unit_id !== filterUnitId) return false;
+      }
+
+      // 5. Error Reason Filter (Scope + Specific Reason Tag)
+      if (filterErrorReasonId) {
+        const targetReason = categories.errorReasons.find(r => r.id === filterErrorReasonId);
+        const targetName = targetReason?.name;
+        const mReasons: string[] = m.error_reason_ids || [];
+        const hasId = mReasons.includes(filterErrorReasonId);
+        const hasName = targetName && mReasons.some(id => {
+          const rObj = categories.errorReasons.find(r => r.id === id);
+          return rObj?.name === targetName;
+        });
+        if (!hasId && !hasName) return false;
+      } else if (filterErrorScope !== 'all') {
+        const mReasons: string[] = m.error_reason_ids || [];
+        if (mReasons.length === 0) return false;
+        const matchesScope = mReasons.some(id => {
+          const rObj = categories.errorReasons.find(r => r.id === id);
+          if (!rObj) return false;
+          if (filterErrorScope === 'global') return !rObj.parent_id;
+          if (filterErrorScope === 'subject') {
+            const isSub = categories.subjects.some(s => s.id === rObj.parent_id);
+            return isSub && (!filterSubjectId || rObj.parent_id === filterSubjectId);
+          }
+          if (filterErrorScope === 'chapter') {
+            return categories.chapters.some(c => c.id === rObj.parent_id);
+          }
+          return false;
+        });
+        if (!matchesScope) return false;
+      }
+
+      // 6. Familiarity Filter (Only ONE Set: 順, 卡, 不會, 誤解)
+      const fName = getEffectiveFamiliarityName(m, categories.familiarities);
+      if (fName && excludedFamNames.includes(fName)) {
         return false;
       }
 
       return true;
     });
-  }, [mistakes, onlyUncategorized, searchQuery, fromDate, toDate, excludedFamIds, categories.familiarities]);
+  }, [
+    mistakes,
+    onlyUncategorized,
+    searchQuery,
+    fromDate,
+    toDate,
+    filterSubjectId,
+    filterUnitId,
+    filterErrorScope,
+    filterErrorReasonId,
+    excludedFamNames,
+    categories.familiarities,
+    categories.chapters,
+    categories.subjects,
+    categories.errorReasons
+  ]);
 
   return (
     <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
@@ -356,31 +521,32 @@ export default function MistakeList({
         </div>
       )}
 
-      {/* Control bar */}
-      <div className="glass no-print" style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', width: '100%' }}>
-          {/* Search */}
-          <div style={{ position: 'relative', width: '300px', minWidth: '240px' }}>
+      {/* Search and Advanced Multi-Dimensional Filter Card */}
+      <div className="glass no-print" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px', borderRadius: 'var(--radius-md)' }}>
+        {/* Row 1: Search Input & Global Action Buttons */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '12px', width: '100%' }}>
+          {/* Keyword Search */}
+          <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: '380px' }}>
             <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
               <Search size={16} />
             </span>
             <input
               type="text"
               className="input"
-              style={{ paddingLeft: '38px', height: '40px' }}
-              placeholder="搜尋題目、敘述或標籤..."
+              style={{ paddingLeft: '38px', height: '38px', width: '100%' }}
+              placeholder="搜尋題目、敘述、來源或標籤..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
 
-          {/* Global toggles and actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Quick Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             {!showOnboarding && (
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ padding: '8px 12px', fontSize: '0.84rem' }}
+                style={{ padding: '7px 11px', fontSize: '0.82rem' }}
                 onClick={() => setShowOnboarding(true)}
               >
                 展開新手引導
@@ -390,7 +556,7 @@ export default function MistakeList({
             <button
               type="button"
               className={`btn ${onlyUncategorized ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '8px 14px', fontSize: '0.86rem' }}
+              style={{ padding: '7px 12px', fontSize: '0.84rem' }}
               onClick={() => setOnlyUncategorized(prev => !prev)}
               data-testid="toggle-uncategorized-mistakes-btn"
             >
@@ -399,18 +565,18 @@ export default function MistakeList({
 
             {filteredMistakes.length > 0 && (
               <>
-                <button className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '0.88rem' }} onClick={handleExpandAll}>
-                  <Eye size={16} /> 展開全部答案
+                <button className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '0.84rem' }} onClick={handleExpandAll}>
+                  <Eye size={15} /> 展開全部答案
                 </button>
-                <button className="btn btn-secondary" style={{ padding: '8px 14px', fontSize: '0.88rem' }} onClick={handleCollapseAll}>
-                  <EyeOff size={16} /> 收折全部答案
+                <button className="btn btn-secondary" style={{ padding: '7px 12px', fontSize: '0.84rem' }} onClick={handleCollapseAll}>
+                  <EyeOff size={15} /> 收折全部答案
                 </button>
               </>
             )}
 
             <button
               className="btn btn-primary"
-              style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+              style={{ padding: '7px 14px', fontSize: '0.88rem' }}
               onClick={() => {
                 setEditingMistake(null);
                 setShowEditor(true);
@@ -422,68 +588,169 @@ export default function MistakeList({
           </div>
         </div>
 
-        {/* Date and Familiarity Filters row */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '24px', borderTop: '1px solid var(--glass-border)', paddingTop: '16px', width: '100%' }}>
-          {/* Date range filter */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>日期範圍：</span>
+        {/* Row 2: Comprehensive Dropdowns (Date / Subject / Unit / Error Reason Scope & Tag) */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '12px 16px',
+          borderTop: '1px solid var(--glass-border)',
+          paddingTop: '12px',
+          fontSize: '0.84rem'
+        }}>
+          {/* 1. Date Range Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>日期：</span>
             <input
               type="date"
               className="input"
-              style={{ width: '150px', height: '36px', padding: '6px 10px', fontSize: '0.85rem' }}
+              style={{ width: '138px', height: '34px', padding: '4px 8px', fontSize: '0.82rem' }}
               value={fromDate}
               onChange={e => setFromDate(e.target.value)}
+              title="起始日期"
             />
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>至</span>
+            <span style={{ color: 'var(--text-muted)' }}>至</span>
             <input
               type="date"
               className="input"
-              style={{ width: '150px', height: '36px', padding: '6px 10px', fontSize: '0.85rem' }}
+              style={{ width: '138px', height: '34px', padding: '4px 8px', fontSize: '0.82rem' }}
               value={toDate}
               onChange={e => setToDate(e.target.value)}
+              title="結束日期"
             />
-            {(fromDate || toDate) && (
-              <button
-                className="btn btn-text"
-                style={{ padding: '4px 8px', fontSize: '0.8rem', height: '36px' }}
-                onClick={() => {
-                  setFromDate('');
-                  setToDate('');
-                }}
-              >
-                清除
-              </button>
-            )}
           </div>
 
-          {/* Familiarity checkboxes (dynamically generated from user's familiarity categories) */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>熟悉度 / 掌握度：</span>
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-              {activeFamiliarities.map(fam => {
-                const checked = !excludedFamIds.includes(fam.id);
-                const displayLabel = fam.name === '順' ? '順 (會)' : fam.name;
-                return (
-                  <label
-                    key={fam.id}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', userSelect: 'none', color: 'var(--text-primary)' }}
-                  >
-                    <input
-                      type="checkbox"
-                      className="input-checkbox"
-                      checked={checked}
-                      onChange={e => toggleFamiliarityExclusion(fam.id, e.target.checked)}
-                    />
-                    <span>{displayLabel}</span>
-                  </label>
-                );
-              })}
-            </div>
+          {/* 2. Subject Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>科目：</span>
+            <select
+              className="input"
+              style={{ height: '34px', padding: '4px 8px', fontSize: '0.82rem', minWidth: '110px' }}
+              value={filterSubjectId}
+              onChange={e => {
+                setFilterSubjectId(e.target.value);
+                setFilterUnitId('');
+              }}
+              data-testid="filter-subject-select"
+            >
+              <option value="">全部科目</option>
+              {activeSubjects.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Unit Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>單元：</span>
+            <select
+              className="input"
+              style={{ height: '34px', padding: '4px 8px', fontSize: '0.82rem', minWidth: '120px', maxWidth: '200px' }}
+              value={filterUnitId}
+              onChange={e => setFilterUnitId(e.target.value)}
+              data-testid="filter-unit-select"
+            >
+              <option value="">全部單元</option>
+              {availableFilterUnits.map(u => (
+                <option key={u.id} value={u.id}>{u.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. Error Reason Filter: Scope + Specific Reason Tag */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>錯因：</span>
+            <select
+              className="input"
+              style={{ height: '34px', padding: '4px 8px', fontSize: '0.82rem', minWidth: '120px' }}
+              value={filterErrorScope}
+              onChange={e => {
+                setFilterErrorScope(e.target.value as any);
+                setFilterErrorReasonId('');
+              }}
+              data-testid="filter-error-scope-select"
+            >
+              <option value="all">全部錯因範圍</option>
+              <option value="global">全科通用錯因</option>
+              <option value="subject">特定科目專屬</option>
+              <option value="chapter">特定章節專屬</option>
+            </select>
+
+            <select
+              className="input"
+              style={{ height: '34px', padding: '4px 8px', fontSize: '0.82rem', minWidth: '125px', maxWidth: '180px' }}
+              value={filterErrorReasonId}
+              onChange={e => setFilterErrorReasonId(e.target.value)}
+              data-testid="filter-error-reason-select"
+            >
+              <option value="">全部錯因標籤</option>
+              {availableFilterErrorReasons.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reset Filters button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-text"
+              style={{ padding: '4px 8px', fontSize: '0.8rem', color: 'var(--accent-secondary)', height: '34px' }}
+              onClick={handleResetAllFilters}
+              title="重設所有搜尋與篩選條件"
+            >
+              重設篩選
+            </button>
+          )}
+        </div>
+
+        {/* Row 3: Familiarity / Mastery Checkboxes (Only ONE Group: 順 / 卡 / 不會 / 誤解) */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '12px',
+          borderTop: '1px solid var(--glass-border)',
+          paddingTop: '10px'
+        }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            熟悉度 / 掌握度：
+          </span>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {deduplicatedFamiliarities.map(fam => {
+              const isChecked = !excludedFamNames.includes(fam.name);
+              const displayLabel = fam.name === '順' ? '順 (會)' : fam.name;
+              const color = fam.color === 'success' ? '#197A27' : fam.color === 'warning' ? '#D97706' : fam.color === 'danger' ? '#C5221F' : 'var(--text-primary)';
+              return (
+                <label
+                  key={fam.name}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    color: 'var(--text-primary)'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    className="input-checkbox"
+                    checked={isChecked}
+                    onChange={e => toggleFamiliarityNameExclusion(fam.name, e.target.checked)}
+                  />
+                  <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? color : 'var(--text-muted)' }}>
+                    {displayLabel}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Dynamic Familiarity Stats Cards */}
+      {/* Dynamic Familiarity Stats Cards (Single Deduplicated Set) */}
       {filteredMistakes.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '14px', margin: '0' }} className="no-print animate-fade-in">
           <div className="glass" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '15px', borderLeft: '4px solid var(--accent-primary)', borderRadius: 'var(--radius-md)' }}>
@@ -493,18 +760,18 @@ export default function MistakeList({
             </span>
           </div>
 
-          {activeFamiliarities.map(fam => {
+          {deduplicatedFamiliarities.map(fam => {
             const count = filteredMistakes.filter(
-              m => getEffectiveFamiliarityId(m, categories.familiarities) === fam.id
+              m => getEffectiveFamiliarityName(m, categories.familiarities) === fam.name
             ).length;
             const color = fam.color === 'success' ? '#197A27' : fam.color === 'warning' ? '#D97706' : fam.color === 'danger' ? '#C5221F' : '#001F65';
             return (
               <div
-                key={fam.id}
+                key={fam.name}
                 className="glass"
                 style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '15px', borderLeft: `4px solid ${color}`, borderRadius: 'var(--radius-md)' }}
               >
-                <span style={{ fontSize: '0.8rem', color, fontWeight: 500 }}>熟悉度：{fam.name}</span>
+                <span style={{ fontSize: '0.8rem', color, fontWeight: 600 }}>熟悉度：{fam.name}</span>
                 <span style={{ fontSize: '1.7rem', fontWeight: 'bold', color }}>
                   {count} <span style={{ fontSize: '0.88rem', fontWeight: 'normal' }}>題</span>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '8px' }}>

@@ -168,15 +168,40 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
       }
     }
 
-    const items = [...subjects, ...chapters, ...units, ...familiarities, ...errorReasons];
+    // Deduplicate familiarities defensively by name and aggregate mistake counts
+    const seenFamNames = new Set<string>();
+    const deduplicatedFams: CategoryItem[] = [];
+    for (const f of familiarities) {
+      if (!seenFamNames.has(f.name)) {
+        seenFamNames.add(f.name);
+        const allMatching = familiarities.filter(item => item.name === f.name);
+        const totalCount = allMatching.reduce((acc, cur) => acc + (cur.mistake_count || 0), 0);
+        deduplicatedFams.push({ ...f, mistake_count: totalCount });
+      }
+    }
+
+    // Deduplicate error reasons defensively by parent_id + name and aggregate mistake counts
+    const seenErrKeys = new Set<string>();
+    const deduplicatedErrs: CategoryItem[] = [];
+    for (const r of errorReasons) {
+      const key = `${r.parent_id || ''}:::${r.name}`;
+      if (!seenErrKeys.has(key)) {
+        seenErrKeys.add(key);
+        const allMatching = errorReasons.filter(item => `${item.parent_id || ''}:::${item.name}` === key);
+        const totalCount = allMatching.reduce((acc, cur) => acc + (cur.mistake_count || 0), 0);
+        deduplicatedErrs.push({ ...r, mistake_count: totalCount });
+      }
+    }
+
+    const items = [...subjects, ...chapters, ...units, ...deduplicatedFams, ...deduplicatedErrs];
 
     return new Response(JSON.stringify({
       items,
       subjects,
       chapters,
       units,
-      familiarities,
-      errorReasons,
+      familiarities: deduplicatedFams,
+      errorReasons: deduplicatedErrs,
       errorReasonMode: (settingsRes as any)?.error_reason_mode || 'multi'
     }), {
       status: 200,

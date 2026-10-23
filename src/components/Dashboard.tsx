@@ -81,8 +81,11 @@ export default function Dashboard({
   } | null>(null);
   const [deletingChapter, setDeletingChapter] = useState(false);
 
-  // Standalone Left-Sidebar Error Reason Management Panel state
+  // Standalone Collapsible Sections state for Left Sidebar (Requirement: 每個區塊可以自由收折，也不要太擁擠)
+  const [section1Expanded, setSection1Expanded] = useState(true);
   const [errorPanelExpanded, setErrorPanelExpanded] = useState(true);
+  const [section3Expanded, setSection3Expanded] = useState(true);
+
   const [errScopeType, setErrScopeType] = useState<'global' | 'subject' | 'chapter'>('global');
   const [errSubjectId, setErrSubjectId] = useState<string>('');
   const [errChapterId, setErrChapterId] = useState<string>('');
@@ -110,18 +113,25 @@ export default function Dashboard({
 
   const sidebarScopedErrorReasons = useMemo(() => {
     const activeList = categories.errorReasons.filter(r => r.is_active === 1);
+    let list: typeof activeList = [];
     if (errScopeType === 'global') {
-      return activeList.filter(r => !r.parent_id);
-    }
-    if (errScopeType === 'subject') {
+      list = activeList.filter(r => !r.parent_id);
+    } else if (errScopeType === 'subject') {
       if (!errSubjectId) return [];
-      return activeList.filter(r => r.parent_id === errSubjectId);
-    }
-    if (errScopeType === 'chapter') {
+      list = activeList.filter(r => r.parent_id === errSubjectId);
+    } else if (errScopeType === 'chapter') {
       if (!errChapterId) return [];
-      return activeList.filter(r => r.parent_id === errChapterId);
+      list = activeList.filter(r => r.parent_id === errChapterId);
+    } else {
+      list = activeList;
     }
-    return activeList;
+    // Deduplicate defensively by name so duplicate error reasons are never shown
+    const seen = new Set<string>();
+    return list.filter(item => {
+      if (seen.has(item.name)) return false;
+      seen.add(item.name);
+      return true;
+    });
   }, [categories.errorReasons, errScopeType, errSubjectId, errChapterId]);
 
   const handleSidebarAddErrorReason = async (e: React.FormEvent) => {
@@ -363,58 +373,83 @@ export default function Dashboard({
 
       {/* Sidebar Content - hidden when collapsed */}
       {!collapsed && (
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {/* Header for 3-level hierarchy: Subject -> Chapter -> Unit (Placed with inline + button for quick access) */}
-          <div style={{
-            padding: '12px 16px 4px 16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            color: 'var(--text-secondary)',
-            fontSize: '0.8rem',
-            fontWeight: 700
-          }}>
-            <span>1. 學科 / 章節 / 單元目錄</span>
-            <button
-              onClick={() => setShowAddSubject(!showAddSubject)}
-              className="btn-sidebar-add"
-              title="快速新增科目"
-              data-testid="sidebar-add-subject-btn"
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', padding: '6px 0' }}>
+          {/* 1. 學科 / 章節 / 單元目錄 Card (Collapsible) */}
+          <div
+            className="sidebar-card washi-card"
+            style={{
+              margin: '4px 10px 2px 10px',
+              padding: '12px 12px 10px 12px',
+              borderRadius: '10px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--glass-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                userSelect: 'none'
+              }}
+              onClick={() => setSection1Expanded(prev => !prev)}
             >
-              <Plus size={13} /> 剪貼新增科目
-            </button>
-          </div>
-          <div style={{ padding: '0 16px 8px 16px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            提示：點擊科目可展開章節；點擊右側「+」可剪貼新增章節或細部單元
-          </div>
-
-          {/* Inline add subject form - Memo Note Style */}
-          {showAddSubject && (
-            <form onSubmit={handleAddSubject} style={{ padding: '4px 14px 10px 14px' }}>
-              <div className="memo-note washi-tape-strip" style={{ padding: '12px 10px 8px 10px', background: 'var(--bg-secondary)' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-secondary)', marginBottom: '4px' }}>
-                  剪貼新增科目便條
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input
-                    type="text"
-                    className="input"
-                    style={{ padding: '6px 10px', fontSize: '0.86rem' }}
-                    placeholder="科目名稱 (例如：生物)"
-                    value={newSubjectName}
-                    onChange={e => setNewSubjectName(e.target.value)}
-                    autoFocus
-                  />
-                  <button type="submit" className="btn btn-primary" style={{ padding: '6px 10px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                    新增
-                  </button>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
+                {section1Expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                <span>1. 學科 / 章節 / 單元目錄</span>
               </div>
-            </form>
-          )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSection1Expanded(true);
+                  setShowAddSubject(!showAddSubject);
+                }}
+                className="btn-sidebar-add"
+                title="快速新增科目"
+                data-testid="sidebar-add-subject-btn"
+              >
+                <Plus size={13} /> 剪貼新增科目
+              </button>
+            </div>
 
-          {/* Subjects -> Chapters -> Units Tree */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 12px 8px', borderBottom: '1px solid var(--glass-border)' }}>
+            {section1Expanded && (
+              <>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.4, padding: '0 2px' }}>
+                  提示：點擊科目可展開章節；點擊右側「+」可剪貼新增章節或細部單元
+                </div>
+
+                {/* Inline add subject form - Memo Note Style */}
+                {showAddSubject && (
+                  <form onSubmit={handleAddSubject} style={{ padding: '4px 0 8px 0' }}>
+                    <div className="memo-note washi-tape-strip" style={{ padding: '12px 10px 8px 10px', background: 'var(--bg-primary)' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-secondary)', marginBottom: '4px' }}>
+                        剪貼新增科目便條
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          className="input"
+                          style={{ padding: '6px 10px', fontSize: '0.86rem' }}
+                          placeholder="科目名稱 (例如：生物)"
+                          value={newSubjectName}
+                          onChange={e => setNewSubjectName(e.target.value)}
+                          autoFocus
+                        />
+                        <button type="submit" className="btn btn-primary" style={{ padding: '6px 10px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                          新增
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+
+                {/* Subjects -> Chapters -> Units Tree */}
+                <div style={{ overflowY: 'auto', maxHeight: '280px', paddingRight: '2px' }}>
             {activeSubjects.map(subject => {
               const isExpanded = !!expandedSubjects[subject.id];
               const chapters = categories.chapters.filter(c => c.parent_id === subject.id && c.is_active === 1);
@@ -680,19 +715,25 @@ export default function Dashboard({
               );
             })}
 
-            {activeSubjects.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '20px', fontSize: '0.85rem' }}>
-                尚未建立科目，請點擊上方「+ 新增科目」按鈕。
-              </div>
+                  {activeSubjects.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '16px', fontSize: '0.85rem' }}>
+                      尚未建立科目，請點擊上方「+ 剪貼新增科目」按鈕。
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
-          {/* Standalone Error Reason Management Panel (Left Sidebar) */}
+          {/* 2. Standalone Error Reason Management Panel (Collapsible Card) */}
           <div
+            className="sidebar-card washi-card"
             style={{
+              margin: '4px 10px',
               padding: '12px 14px',
-              borderBottom: '1px solid var(--glass-border)',
-              background: 'rgba(245, 158, 11, 0.04)',
+              borderRadius: '10px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--glass-border)',
               display: 'flex',
               flexDirection: 'column',
               gap: '8px'
@@ -709,11 +750,13 @@ export default function Dashboard({
               }}
               onClick={() => setErrorPanelExpanded(prev => !prev)}
             >
-              <span className="sidebar-section2-title">
-                <Tag size={14} />
-                <span>2. 錯因標籤設定（獨立面板）</span>
-              </span>
-              {errorPanelExpanded ? <ChevronDown size={15} style={{ color: 'var(--text-secondary)' }} /> : <ChevronRight size={15} style={{ color: 'var(--text-secondary)' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {errorPanelExpanded ? <ChevronDown size={15} style={{ color: 'var(--text-secondary)' }} /> : <ChevronRight size={15} style={{ color: 'var(--text-secondary)' }} />}
+                <span className="sidebar-section2-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Tag size={14} />
+                  <span>2. 錯因標籤設定（獨立面板）</span>
+                </span>
+              </div>
             </div>
 
             {errorPanelExpanded && (
@@ -872,21 +915,48 @@ export default function Dashboard({
             )}
           </div>
 
-          {/* Primary Navigation Menu (Requirement 10) */}
-          <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '2px' }}>
-              3. 功能導覽選單
-            </div>
-            <button
-              onClick={() => onNavigateView('dashboard')}
-              className={`btn ${activeView === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '7px 12px', fontSize: '0.85rem' }}
-              data-testid="nav-dashboard"
-              title="一覽各科題數、熟悉度分布與近期錯題"
+          {/* 3. Primary Navigation Menu (Collapsible Card) */}
+          <div
+            className="sidebar-card washi-card"
+            style={{
+              margin: '4px 10px 14px 10px',
+              padding: '12px 14px',
+              borderRadius: '10px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--glass-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                userSelect: 'none'
+              }}
+              onClick={() => setSection3Expanded(prev => !prev)}
             >
-              <LayoutDashboard size={15} />
-              <span>儀表板總覽（錯題統整）</span>
-            </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                {section3Expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                <span>3. 功能導覽選單</span>
+              </div>
+            </div>
+
+            {section3Expanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '2px' }}>
+                <button
+                  onClick={() => onNavigateView('dashboard')}
+                  className={`btn ${activeView === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px', fontSize: '0.85rem' }}
+                  data-testid="nav-dashboard"
+                  title="一覽各科題數、熟悉度分布與近期錯題"
+                >
+                  <LayoutDashboard size={15} />
+                  <span>儀表板總覽（錯題統整）</span>
+                </button>
 
             <button
               onClick={() => onSelectHierarchy(null, null, null)}
@@ -957,13 +1027,15 @@ export default function Dashboard({
             <button
               onClick={() => onNavigateView('guide')}
               className={`btn ${activeView === 'guide' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ width: '100%', justifyContent: 'flex-start', padding: '7px 12px', fontSize: '0.85rem' }}
+              style={{ width: '100%', justifyContent: 'flex-start', padding: '8px 12px', fontSize: '0.85rem' }}
               data-testid="nav-guide"
               title="查看完整圖文功能介紹與操作說明"
             >
               <HelpCircle size={15} />
               <span>使用說明與教學</span>
             </button>
+              </div>
+            )}
           </div>
         </div>
       )}
