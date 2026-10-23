@@ -1,0 +1,31 @@
+{
+  "name": "pobinotes-mistake-notebook",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:local": "tsc -b && vite build && powershell -Command \"if (Test-Path dist) { Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory((Resolve-Path dist).Path, 'OnlyErrorDialogs', 'SendToRecycleBin') }; Copy-Item -Recurse -Force 'C:/Users/jimmy/AppData/Local/Temp/mistake-notebook-dist' 'dist'\"",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test:e2e": "node tests/e2e/runner.js"
+  },
+  "dependencies": {
+    "lucide-react": "^1.23.0",
+    "puppeteer": "^25.3.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "oxlint": "^1.71.0",
+    "typescript": "~6.0.2",
+    "vite": "^6.4.3",
+    "wrangler": "^4.107.0"
+  }
+}

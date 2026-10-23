@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png?v=2" />
+    <link rel="apple-touch-icon" href="/logo.png?v=2" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PobiNotes-線上錯題本</title>
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100%';
+        div.style.background = '#7f1d1d';
+        div.style.color = '#fecaca';
+        div.style.zIndex = '999999';
+        div.style.padding = '24px';
+        div.style.fontFamily = 'monospace';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.borderBottom = '4px solid #ef4444';
+        div.innerText = 'Global Exception Caught:\n' + message + '\n\nAt: ' + source + ':' + lineno + ':' + colno + '\n\nStack:\n' + (error ? error.stack : 'N/A');
+        document.body.appendChild(div);
+        return false;
+      };
+      window.addEventListener('unhandledrejection', function(event) {
+        var div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100%';
+        div.style.background = '#7f1d1d';
+        div.style.color = '#fecaca';
+        div.style.zIndex = '999999';
+        div.style.padding = '24px';
+        div.style.fontFamily = 'monospace';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.borderBottom = '4px solid #ef4444';
+        div.innerText = 'Unhandled Promise Rejection:\n' + event.reason + '\n\nStack:\n' + (event.reason && event.reason.stack ? event.reason.stack : 'N/A');
+        document.body.appendChild(div);
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

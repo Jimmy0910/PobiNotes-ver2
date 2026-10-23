@@ -1,0 +1,1030 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+
+:root {
+  /* POBI STUDIO Official Brand Colors (Brand Master Guideline v1.3) */
+  --pobi-blue: #001F65;
+  --pobi-green: #197A27;
+  --pobi-background: #FFFFFF;
+  --pobi-surface: #FAF7F0;
+  --pobi-dark-background: #0B1220;
+
+  /* Light Theme (Default: 溫潤米黃書頁紙張 + 實體手作筆記本質感) */
+  color-scheme: light;
+  --bg-primary: #F4EFEB;           /* 典雅書桌/桌面底色 */
+  --bg-secondary: #FAF7F0;         /* 溫潤米白筆記卡片底色 */
+  --notebook-paper: #FAF6ED;       /* 經典米黃書頁色 (Warm Cream / Ivory) */
+  --notebook-desk: #ECE6DE;        /* 木質/皮革書桌質感 */
+  --notebook-line: rgba(0, 31, 101, 0.06); /* 筆記紙橫線淡印 */
+  --notebook-margin: rgba(25, 122, 39, 0.28); /* 活頁裝訂與邊界紅綠墨水線 */
+  --notebook-stitch: rgba(0, 31, 101, 0.14); /* 車縫裝訂線 */
+
+  --glass-bg: #FAF7F0;
+  --glass-border: #D8D0C5;         /* 實體裝訂紙張邊緣邊框 */
+  --glass-highlight: #F0EAE1;
+  
+  --text-primary: #001F65;         /* POBI Blue 深海軍藍墨水 (高對比清楚清晰) */
+  --text-secondary: #1E293B;       /* 深石板墨水色 */
+  --text-muted: #526178;           /* 輔助墨水色 (非過淺灰，維持高易讀性) */
+  
+  --accent-primary: #001F65;
+  --accent-secondary: #197A27;
+  --accent-gradient: linear-gradient(100deg, #001F65, #197A27);
+  --accent-gradient-hover: linear-gradient(100deg, #00174A, #146320);
+  --title-gradient: linear-gradient(100deg, #001F65 0%, #156621 100%);
+  
+  --success: #197A27;
+  --success-glow: rgba(25, 122, 39, 0.16);
+  --danger: #B91C1C;
+  --danger-glow: rgba(185, 28, 28, 0.14);
+  --warning: #B45309;             /* 溫暖赭黃/焦糖，避免淺色底看不清 */
+  --warning-glow: rgba(180, 83, 9, 0.14);
+  
+  --shadow-sm: 0 1px 3px rgba(0, 31, 101, 0.05);
+  --shadow-md: 0 4px 14px rgba(0, 31, 101, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 25px rgba(0, 31, 101, 0.1), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 35px rgba(0, 31, 101, 0.14), 0 5px 12px rgba(0, 0, 0, 0.06);
+  
+  --washi-tape-green: rgba(25, 122, 39, 0.32);
+  --washi-tape-blue: rgba(0, 31, 101, 0.25);
+  --washi-tape-amber: rgba(180, 83, 9, 0.28);
+
+  --font-sans: 'Outfit', 'Noto Sans TC', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  /* Dark Theme (深色工程風 + 深色皮革活頁手帳) */
+  --bg-primary: #0B1220;           /* POBI Dark 主背景 */
+  --bg-secondary: #121D2F;         /* 深海軍藍活頁夾卡片底色 */
+  --notebook-paper: #121E31;       /* 深色紙張底色 */
+  --notebook-desk: #080D17;        /* 深色桌面 */
+  --notebook-line: rgba(255, 255, 255, 0.05);
+  --notebook-margin: rgba(74, 222, 128, 0.3);
+  --notebook-stitch: rgba(255, 255, 255, 0.12);
+
+  --glass-bg: rgba(18, 29, 47, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-highlight: rgba(0, 31, 101, 0.5);
+  
+  --text-primary: #FFFFFF;         /* 純白高對比 */
+  --text-secondary: #E2E8F0;       /* 白銀灰 (高可讀性，絕非深色字) */
+  --text-muted: #94A3B8;           /* 淺灰字體 */
+  
+  --accent-primary: #22C55E;       /* 明亮科技綠 */
+  --accent-secondary: #38BDF8;     /* 亮青藍 */
+  --accent-gradient: linear-gradient(100deg, #197A27, #22C55E);
+  --accent-gradient-hover: linear-gradient(100deg, #146320, #16A34A);
+  --title-gradient: linear-gradient(100deg, #FFFFFF 15%, #4ADE80 85%); /* 深色模式高對比標題白綠漸層 */
+  
+  --success: #22C55E;
+  --success-glow: rgba(34, 197, 94, 0.25);
+  --danger: #EF4444;
+  --danger-glow: rgba(239, 68, 68, 0.25);
+  --warning: #FBBF24;
+  --warning-glow: rgba(251, 191, 36, 0.25);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.65);
+  --shadow-xl: 0 20px 35px rgba(0, 0, 0, 0.75);
+
+  --washi-tape-green: rgba(34, 197, 94, 0.4);
+  --washi-tape-blue: rgba(56, 189, 248, 0.4);
+  --washi-tape-amber: rgba(251, 191, 36, 0.4);
+}
+
+/* Global Reset & Base Styling */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  line-height: 1.5;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Ambient Desk Atmosphere (溫暖木質/皮革書桌氛圍，告別冰冷AI光斑) */
+.bg-ambient-lights {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background: 
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.7) 0%, transparent 65%),
+    linear-gradient(180deg, rgba(0, 31, 101, 0.02) 0%, rgba(25, 122, 39, 0.02) 100%);
+}
+
+[data-theme="dark"] .bg-ambient-lights {
+  background: 
+    radial-gradient(ellipse at 50% 0%, rgba(0, 31, 101, 0.3) 0%, transparent 75%),
+    #0B1220;
+}
+
+.pobi-gradient {
+  background: linear-gradient(100deg, var(--pobi-blue), var(--pobi-green));
+}
+
+/* =======================================================
+   Physical Notebook & Hardcover Skeuomorphic Styles
+   ======================================================= */
+
+/* Physical Notebook Outer Frame & Binder Spine */
+.notebook-desk {
+  background-color: var(--notebook-desk);
+}
+
+.notebook-page {
+  background-color: var(--notebook-paper);
+  background-image: 
+    linear-gradient(to right, var(--notebook-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--notebook-line) 1px, transparent 1px);
+  background-size: 22px 22px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 10px 28px rgba(0, 31, 101, 0.08),
+    -3px 0 0 -1px var(--notebook-paper),
+    -4px 0 0 0 var(--glass-border),
+    -7px 0 0 -1px var(--notebook-paper),
+    -8px 0 0 0 var(--glass-border);
+  position: relative;
+}
+
+/* Hardcover Book Cover (實體精裝書本封面 - 用於登入頁面) */
+.hardcover-book-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  perspective: 1000px;
+}
+
+.hardcover-book {
+  position: relative;
+  background: linear-gradient(145deg, #00174B 0%, #001F65 50%, #062B75 100%);
+  border-radius: 6px 18px 18px 6px;
+  padding: 34px 28px 34px 42px;
+  box-shadow: 
+    -15px 0 28px rgba(0, 0, 0, 0.45),      /* 書脊左側立體厚度陰影 */
+    0 18px 45px rgba(0, 31, 101, 0.28),     /* 書底投影 */
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset -3px 0 8px rgba(0, 0, 0, 0.35);    /* 書槽開闔壓痕 */
+  border-left: 20px solid #001338;          /* 精裝厚實書脊 */
+  overflow: hidden;
+}
+
+/* 書脊上的燙金/車縫凹槽線 */
+.hardcover-book::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, 
+    transparent 0%, 
+    rgba(255, 215, 0, 0.35) 20%, 
+    rgba(255, 215, 0, 0.35) 80%, 
+    transparent 100%
+  );
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.6);
+  z-index: 5;
+}
+
+/* 封面車縫線外框 */
+.cover-stitched-frame {
+  position: absolute;
+  inset: 10px 10px 10px 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 4px 12px 12px 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 書角金色包角 (Brass Book Corners) */
+.book-corner-brass {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #D4AF37;
+  pointer-events: none;
+  z-index: 10;
+}
+.book-corner-tr {
+  top: 4px;
+  right: 4px;
+  border-left: none;
+  border-bottom: none;
+  border-radius: 0 14px 0 0;
+  background: radial-gradient(circle at top right, rgba(212, 175, 55, 0.45) 0%, transparent 70%);
+}
+.book-corner-br {
+  bottom: 4px;
+  right: 4px;
+  border-left: none;
+  border-top: none;
+  border-radius: 0 0 14px 0;
+  background: radial-gradient(circle at bottom right, rgba(212, 175, 55, 0.45) 0%, transparent 70%);
+}
+
+/* 垂掛緞面書籤絲帶 (Bookmark Ribbon) */
+.book-ribbon-tag {
+  position: absolute;
+  top: -2px;
+  right: 36px;
+  width: 22px;
+  height: 64px;
+  background: linear-gradient(180deg, #197A27 0%, #11591C 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  z-index: 15;
+  pointer-events: none;
+}
+
+/* 封面上的米黃藏書票/扉頁 (Bookplate Insertion Page) */
+.bookplate-insert {
+  position: relative;
+  background: #FAF6ED;                      /* 溫潤米黃紙質 */
+  background-image: radial-gradient(rgba(0, 31, 101, 0.05) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border: 1px solid #D4C9BA;
+  border-radius: 8px;
+  padding: 28px 24px 22px 24px;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.18),
+    0 8px 20px rgba(0, 0, 0, 0.12);
+  z-index: 5;
+}
+
+/* Physical Notebook Spiral Binder / Spine indicator */
+.notebook-binder-edge {
+  position: relative;
+}
+
+.notebook-binder-edge::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 28px,
+    rgba(0, 31, 101, 0.12) 28px,
+    rgba(0, 31, 101, 0.2) 32px,
+    transparent 36px
+  );
+  border-right: 1px dashed var(--glass-border);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Notebook Header with Bookmark Ribbon */
+.notebook-header-ribbon {
+  position: relative;
+}
+
+.notebook-header-ribbon::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 28px;
+  width: 14px;
+  height: 38px;
+  background: linear-gradient(180deg, var(--accent-secondary), #0e5218);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+/* Scrapbook Washi Tape Strips (和紙膠帶剪貼效果) */
+.washi-tape-strip {
+  position: relative;
+}
+
+.washi-tape-strip::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-0.8deg);
+  width: 110px;
+  height: 22px;
+  background: var(--washi-tape-green);
+  border-left: 3px dashed rgba(255, 255, 255, 0.7);
+  border-right: 3px dashed rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 4px rgba(0, 31, 101, 0.12);
+  z-index: 8;
+  pointer-events: none;
+}
+
+.washi-tape-blue::before {
+  background: var(--washi-tape-blue);
+  transform: translateX(-50%) rotate(0.6deg);
+}
+
+.washi-tape-amber::before {
+  background: var(--washi-tape-amber);
+  transform: translateX(-50%) rotate(-1.2deg);
+}
+
+/* Clipped Scrapbook Flashcard (剪貼卡片質感) */
+.scrapbook-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: 
+    0 2px 6px rgba(0, 31, 101, 0.05),
+    0 8px 20px rgba(0, 31, 101, 0.08);
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+}
+
+.scrapbook-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 10px rgba(0, 31, 101, 0.08),
+    0 14px 28px rgba(0, 31, 101, 0.12);
+}
+
+/* Sticky Memo Note (剪貼便利貼新增框) */
+.memo-note {
+  background: var(--notebook-paper);
+  border: 1.5px dashed var(--accent-secondary);
+  border-radius: 10px;
+  box-shadow: 2px 4px 14px rgba(0, 31, 101, 0.08);
+  position: relative;
+}
+
+/* Notebook Index Tab (側邊活頁索引貼) */
+.notebook-index-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  border-radius: 8px 8px 0 0;
+  border-top: 2px solid var(--accent-secondary);
+  background: var(--glass-bg);
+  box-shadow: 0 -2px 6px rgba(0, 31, 101, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notebook-index-tab.active {
+  background: var(--notebook-paper);
+  border-top: 3px solid var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 -4px 10px rgba(0, 31, 101, 0.09);
+}
+
+/* Glassmorphism Styles */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(0, 31, 101, 0.25);
+}
+
+/* Typography & Headers */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.title-gradient {
+  background: var(--title-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: var(--text-primary);
+}
+
+.navbar-title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="light"] .navbar-title {
+  color: #001F65;
+  background: linear-gradient(100deg, #001F65 0%, #156621 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme="dark"] .navbar-title {
+  color: #FFFFFF;
+  background: linear-gradient(100deg, #FFFFFF 15%, #4ADE80 85%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Sidebar Specific High-Contrast Elements */
+.sidebar-section2-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s ease;
+}
+
+[data-theme="light"] .sidebar-section2-title {
+  color: #92400E; /* 深琥珀棕色，淺色底超清晰 */
+}
+
+[data-theme="dark"] .sidebar-section2-title {
+  color: #FCD34D; /* 明亮金色，深色底清晰可辨 */
+}
+
+/* Sidebar Add Subject Button */
+.btn-sidebar-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .btn-sidebar-add {
+  background: #E8F5E9;
+  border: 1px solid #A5D6A7;
+  color: #14532D;
+}
+
+[data-theme="light"] .btn-sidebar-add:hover {
+  background: #C8E6C9;
+}
+
+[data-theme="dark"] .btn-sidebar-add {
+  background: rgba(74, 222, 128, 0.18);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: #4ADE80;
+}
+
+[data-theme="dark"] .btn-sidebar-add:hover {
+  background: rgba(74, 222, 128, 0.28);
+}
+
+/* Scope Badges with High Contrast */
+.scope-badge-global {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .scope-badge-global {
+  background: #E8F5E9;
+  color: #14532D;
+  border: 1px solid #C8E6C9;
+}
+
+[data-theme="dark"] .scope-badge-global {
+  background: rgba(34, 197, 94, 0.22);
+  color: #4ADE80;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+}
+
+.scope-badge-subject {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .scope-badge-subject {
+  background: #EDE9FE;
+  color: #4C1D95;
+  border: 1px solid #DDD6FE;
+}
+
+[data-theme="dark"] .scope-badge-subject {
+  background: rgba(165, 180, 252, 0.22);
+  color: #C7D2FE;
+  border: 1px solid rgba(165, 180, 252, 0.35);
+}
+
+.scope-badge-chapter {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .scope-badge-chapter {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+[data-theme="dark"] .scope-badge-chapter {
+  background: rgba(251, 191, 36, 0.22);
+  color: #FDE047;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--accent-gradient);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 31, 101, 0.22);
+}
+
+.btn-primary:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 31, 101, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--glass-highlight);
+  border-color: var(--text-secondary);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+  box-shadow: 0 4px 12px var(--danger-glow);
+}
+
+.btn-danger:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.btn-text {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+}
+
+.btn-text:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg);
+}
+
+/* Inputs & Form Controls */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.input:focus {
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 0 3px rgba(25, 122, 39, 0.18);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+select.input {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--glass-border) !important;
+  font-weight: 500;
+}
+
+select.input option,
+select.input optgroup,
+select option,
+select optgroup {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  font-weight: 500;
+}
+
+[data-theme="light"] select.input {
+  background-color: #ffffff !important;
+  color: #001F65 !important;
+  border-color: rgba(0, 31, 101, 0.18) !important;
+  font-weight: 600;
+}
+
+[data-theme="light"] select.input option,
+[data-theme="light"] select.input optgroup,
+[data-theme="light"] select option,
+[data-theme="light"] select optgroup {
+  background-color: #ffffff !important;
+  color: #001F65 !important;
+  font-weight: 600;
+}
+
+[data-theme="dark"] select.input {
+  background-color: #101B2E !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  font-weight: 500;
+}
+
+[data-theme="dark"] select.input option,
+[data-theme="dark"] select.input optgroup,
+[data-theme="dark"] select option,
+[data-theme="dark"] select optgroup {
+  background-color: #101B2E !important;
+  color: #ffffff !important;
+  font-weight: 500;
+}
+[data-theme="light"] select option,
+[data-theme="light"] select optgroup {
+  background-color: #ffffff;
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.input-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+/* Layout Utilities */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 900px) {
+  .grid-cols-3, .grid-cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr; }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom Collapsible details/summary */
+.collapsible-container {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.1);
+  margin-top: 12px;
+}
+
+.collapsible-trigger {
+  padding: 12px 16px;
+  background: var(--glass-bg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.collapsible-trigger:hover {
+  background: var(--glass-highlight);
+}
+
+.collapsible-content {
+  padding: 16px;
+  border-top: 1px solid var(--glass-border);
+  animation: fadeIn 0.3s ease;
+}
+
+/* Print CSS Stylesheet */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt;
+    font-family: 'Noto Sans TC', sans-serif !important;
+  }
+  
+  .bg-ambient-lights,
+  header,
+  nav,
+  .no-print,
+  .btn,
+  .theme-toggle,
+  .collapsible-trigger svg,
+  .sidebar,
+  .filters-container {
+    display: none !important;
+  }
+
+  .container {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-page {
+    page-break-after: always;
+  }
+
+  /* Force display of answers in Complete/解析 mode during print */
+  .print-solution-mode .collapsible-content {
+    display: block !important;
+    border-top: 1px dashed #cccccc !important;
+    margin-top: 10px !important;
+    padding-top: 10px !important;
+  }
+
+  /* Force hide answers in Practice/練習 mode during print */
+  .print-practice-mode .collapsible-container,
+  .print-practice-mode .collapsible-content,
+  .print-practice-mode .answer-section {
+    display: none !important;
+  }
+
+  .mistake-card-print {
+    border: 1px solid #000000 !important;
+    border-radius: 4px !important;
+    padding: 15px !important;
+    margin-bottom: 25px !important;
+    page-break-inside: avoid !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .mistake-card-print h3 {
+    border-bottom: 1px solid #000000 !important;
+    padding-bottom: 5px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .print-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+
+  img {
+    max-width: 80% !important;
+    max-height: 4in !important;
+    display: block !important;
+    margin: 10px 0 !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+/* ========================================
+   Modal Overlay & Content
+   ======================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  position: relative;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* ========================================
+   Sidebar Transitions
+   ======================================== */
+.sidebar {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-collapsed {
+  width: 48px !important;
+}
+
+.sidebar-expanded {
+  width: 300px;
+}
+
+/* ========================================
+   Spin Animation (for loaders)
+   ======================================== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ========================================
+   Responsive Layout
+   ======================================== */
+
+/* Mobile: <768px */
+@media (max-width: 767px) {
+  /* Navbar responsive */
+  .top-navbar {
+    height: auto !important;
+    min-height: 56px;
+    padding: 8px 12px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .navbar-brand {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .navbar-title {
+    font-size: 1rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .navbar-actions {
+    flex-wrap: wrap;
+    gap: 6px !important;
+    justify-content: flex-end;
+  }
+
+  .navbar-btn-text {
+    display: none;
+  }
+
+  .navbar-user-info {
+    display: none;
+  }
+
+  /* Sidebar defaults collapsed on mobile */
+  .sidebar-expanded {
+    position: fixed;
+    left: 0;
+    top: 56px;
+    z-index: 40;
+    width: 280px !important;
+    height: calc(100vh - 56px) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+    background: var(--bg-secondary) !important;
+  }
+
+  .sidebar-collapsed {
+    width: 40px !important;
+  }
+
+  /* Main content full width */
+  .main-layout {
+    flex-direction: row;
+  }
+
+  /* Glass card adjustments */
+  .glass-card {
+    padding: 16px;
+  }
+
+  .glass {
+    padding: 16px;
+  }
+
+  /* Table responsive */
+  .glass-card table {
+    font-size: 0.8rem;
+  }
+
+  .glass-card th, .glass-card td {
+    padding: 8px 10px !important;
+  }
+}
+
+/* Tablet: 768px - 1024px */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .sidebar-expanded {
+    width: 240px !important;
+  }
+
+  .navbar-btn-text {
+    display: none;
+  }
+
+  .top-navbar {
+    padding: 0 16px !important;
+  }
+
+  .glass-card {
+    padding: 20px;
+  }
+}
+
+/* Desktop: >1024px */
+@media (min-width: 1025px) {
+  .sidebar-expanded {
+    width: 300px;
+  }
+}
