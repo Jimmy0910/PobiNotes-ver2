@@ -9,6 +9,7 @@
     "build:local": "tsc -b && vite build && powershell -Command \"if (Test-Path dist) { Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory((Resolve-Path dist).Path, 'OnlyErrorDialogs', 'SendToRecycleBin') }; Copy-Item -Recurse -Force 'C:/Users/jimmy/AppData/Local/Temp/mistake-notebook-dist' 'dist'\"",
     "lint": "oxlint",
     "preview": "vite preview",
+    "deploy": "wrangler pages deploy dist",
     "test:e2e": "node tests/e2e/runner.js"
   },
   "dependencies": {
