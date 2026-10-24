@@ -1,6 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiRequest } from '../utils/api';
-import { Printer, ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
+import {
+  Printer,
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Loader2,
+  FileDown,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCcw,
+  Trash2
+} from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface FieldOption {
   value: string;
@@ -47,6 +61,17 @@ export default function ExportPDF({ mistakeIds, onBack, onImageClick }: ExportPD
   const [loading, setLoading] = useState(false);
   const [exportMode, setExportMode] = useState<'practice' | 'solution'>('practice');
   const [checkedStates, setCheckedStates] = useState<{ [mistakeId: string]: { [fieldId: string]: string[] } }>({});
+
+  // PDF Generation & 1-Minute Temporary Cache States
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfProgressText, setPdfProgressText] = useState('');
+  const [cachedPdfUrl, setCachedPdfUrl] = useState<string | null>(null);
+  const [pdfFileName, setPdfFileName] = useState('');
+  const [pdfExpireTime, setPdfExpireTime] = useState<number | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState(0);
+  const [pdfExpired, setPdfExpired] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const cachedBlobRef = useRef<Blob | null>(null);
 
   const normalizeOptions = (options: any[] | undefined): FieldOption[] => {
     if (!options) return [];
@@ -124,6 +149,143 @@ export default function ExportPDF({ mistakeIds, onBack, onImageClick }: ExportPD
     fetchSelectedMistakes();
   }, [mistakeIds]);
 
+  // 1-minute (60s) Countdown & Cache Disposal Timer
+  useEffect(() => {
+    if (!pdfExpireTime || !cachedPdfUrl) return;
+
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((pdfExpireTime - Date.now()) / 1000));
+      setCountdownSeconds(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(timer);
+        if (cachedPdfUrl) {
+          URL.revokeObjectURL(cachedPdfUrl);
+        }
+        setCachedPdfUrl(null);
+        cachedBlobRef.current = null;
+        setPdfExpired(true);
+      }
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, [pdfExpireTime, cachedPdfUrl]);
+
+  // Revoke object URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (cachedPdfUrl) {
+        URL.revokeObjectURL(cachedPdfUrl);
+      }
+    };
+  }, [cachedPdfUrl]);
+
+  const handleClearCache = () => {
+    if (cachedPdfUrl) {
+      URL.revokeObjectURL(cachedPdfUrl);
+    }
+    setCachedPdfUrl(null);
+    cachedBlobRef.current = null;
+    setPdfExpireTime(null);
+    setPdfExpired(false);
+    setCountdownSeconds(0);
+  };
+
+  const handleGeneratePdf = async () => {
+    const element = document.getElementById('print-sheet-preview');
+    if (!element) return;
+
+    setIsGenerating(true);
+    setPdfProgressText('準備頁面素材...');
+    setPdfError(null);
+    setPdfExpired(false);
+
+    // 清除舊的暫存 URL
+    if (cachedPdfUrl) {
+      URL.revokeObjectURL(cachedPdfUrl);
+      setCachedPdfUrl(null);
+      cachedBlobRef.current = null;
+    }
+
+    try {
+      // 確保所有預覽圖片載入完成
+      const images = Array.from(element.querySelectorAll('img'));
+      if (images.length > 0) {
+        setPdfProgressText('載入題目圖檔中...');
+        await Promise.all(
+          images.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          })
+        );
+      }
+
+      setPdfProgressText('渲染高畫質 A4 紙張中...');
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      setPdfProgressText('編譯 PDF 檔案...');
+      const imgWidth = 210; // A4 寬度 (mm)
+      const pageHeight = 297; // A4 高度 (mm)
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      let position = 0;
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+      // 第一頁
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // 若高度超出單頁，依序加頁
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const pdfBlob = pdf.output('blob');
+      cachedBlobRef.current = pdfBlob;
+      const blobUrl = URL.createObjectURL(pdfBlob);
+
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+      const modeText = exportMode === 'practice' ? '自主練習卷' : '錯題解析卷';
+      const fileName = `PobiNotes_${modeText}_${dateStr}.pdf`;
+
+      setCachedPdfUrl(blobUrl);
+      setPdfFileName(fileName);
+      setPdfExpireTime(Date.now() + 60 * 1000); // 暫存 1 分鐘 (60 秒)
+      setCountdownSeconds(60);
+      setPdfExpired(false);
+    } catch (err: any) {
+      console.error('PDF 生成失敗：', err);
+      setPdfError(err.message || '建立 PDF 失敗，請重試或改用原生列印。');
+    } finally {
+      setIsGenerating(false);
+      setPdfProgressText('');
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!cachedPdfUrl) return;
+    const link = document.createElement('a');
+    link.href = cachedPdfUrl;
+    link.download = pdfFileName || 'PobiNotes_錯題卷.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -140,8 +302,8 @@ export default function ExportPDF({ mistakeIds, onBack, onImageClick }: ExportPD
           <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>錯題 PDF 匯出預覽</span>
         </div>
 
-        {/* Mode Toggle & Print Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Mode Toggle, PDF Builder & Print Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{
             display: 'flex',
             background: 'var(--glass-bg)',
@@ -177,11 +339,193 @@ export default function ExportPDF({ mistakeIds, onBack, onImageClick }: ExportPD
             </button>
           </div>
 
-          <button className="btn btn-primary" onClick={handlePrint} disabled={mistakes.length === 0}>
-            <Printer size={16} /> 列印 / 儲存 PDF
+          {/* 建立 PDF (暫存 1 分鐘下載) 按鈕 */}
+          <button
+            className="btn btn-primary"
+            onClick={handleGeneratePdf}
+            disabled={isGenerating || mistakes.length === 0}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>建立 PDF 中...</span>
+              </>
+            ) : (
+              <>
+                <FileDown size={16} />
+                <span>建立 PDF (暫存 1 分鐘)</span>
+              </>
+            )}
+          </button>
+
+          {/* 原生列印按鈕 (保留備用) */}
+          <button
+            className="btn btn-secondary"
+            onClick={handlePrint}
+            disabled={mistakes.length === 0}
+            title="開啟瀏覽器原生列印視窗"
+            style={{ padding: '8px 12px' }}
+          >
+            <Printer size={15} /> 原生列印
           </button>
         </div>
       </div>
+
+      {/* Temporary PDF Cache & Status Card */}
+      {isGenerating && (
+        <div className="glass no-print animate-fade-in" style={{
+          padding: '16px 20px',
+          borderLeft: '4px solid var(--accent-primary)',
+          background: 'rgba(0, 31, 101, 0.05)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent-primary)' }} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>正在網頁上建立高畫質 PDF...</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              進度：{pdfProgressText || '處理中，請稍候'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cachedPdfUrl && !isGenerating && (
+        <div className="glass no-print animate-fade-in" style={{
+          padding: '18px 24px',
+          borderLeft: '4px solid var(--success)',
+          background: 'rgba(25, 122, 39, 0.08)',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <CheckCircle2 size={22} style={{ color: 'var(--success)' }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                  PDF 文件已在網頁建立完成！
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  檔案名稱：<code style={{ background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px' }}>{pdfFileName}</code>（暫存於瀏覽器記憶體，限時 1 分鐘）
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {/* 倒數計時膠囊 */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '20px',
+                background: countdownSeconds <= 15 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(25, 122, 39, 0.15)',
+                color: countdownSeconds <= 15 ? 'var(--danger)' : 'var(--success)',
+                fontWeight: 700,
+                fontSize: '0.88rem'
+              }}>
+                <Clock size={15} />
+                <span>剩餘 {countdownSeconds} 秒自動清除</span>
+              </div>
+
+              {/* 下載按鈕 */}
+              <button
+                className="btn btn-primary"
+                onClick={handleDownloadPdf}
+                style={{
+                  background: 'var(--success)',
+                  color: '#ffffff',
+                  padding: '8px 18px',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(25, 122, 39, 0.25)'
+                }}
+              >
+                <FileDown size={17} /> 立即下載 PDF
+              </button>
+
+              <button
+                className="btn btn-text"
+                onClick={handleClearCache}
+                title="手動清除此暫存"
+                style={{ padding: '8px', color: 'var(--text-muted)' }}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* 倒數計時進度條 */}
+          <div style={{ width: '100%', height: '5px', background: 'rgba(0,0,0,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${Math.max(0, (countdownSeconds / 60) * 100)}%`,
+              background: countdownSeconds <= 15 ? 'var(--danger)' : 'var(--success)',
+              transition: 'width 0.5s linear, background-color 0.3s ease'
+            }} />
+          </div>
+        </div>
+      )}
+
+      {pdfExpired && !cachedPdfUrl && !isGenerating && (
+        <div className="glass no-print animate-fade-in" style={{
+          padding: '14px 20px',
+          borderLeft: '4px solid var(--warning-border)',
+          background: 'var(--warning-bg)',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={18} style={{ color: 'var(--warning-border)' }} />
+            <span style={{ fontSize: '0.88rem', color: 'var(--warning-text)', fontWeight: 500 }}>
+              暫存 PDF 已逾 1 分鐘，並已自動銷毀以釋放資源。如需下載，請再次點擊「建立 PDF」。
+            </span>
+          </div>
+          <button
+            className="btn btn-secondary"
+            onClick={handleGeneratePdf}
+            style={{ padding: '6px 12px', fontSize: '0.84rem' }}
+          >
+            <RotateCcw size={14} /> 重新建立 PDF
+          </button>
+        </div>
+      )}
+
+      {pdfError && (
+        <div className="glass no-print animate-fade-in" style={{
+          padding: '14px 20px',
+          borderLeft: '4px solid var(--danger)',
+          background: 'rgba(239, 68, 68, 0.08)',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={18} style={{ color: 'var(--danger)' }} />
+            <span style={{ fontSize: '0.88rem', color: 'var(--danger)' }}>{pdfError}</span>
+          </div>
+          <button
+            className="btn btn-secondary"
+            onClick={handleGeneratePdf}
+            style={{ padding: '6px 12px', fontSize: '0.84rem' }}
+          >
+            重試
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px' }} className="no-print">

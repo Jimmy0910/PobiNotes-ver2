@@ -294,11 +294,11 @@ export default function App() {
 
       {/* Top Navbar */}
       <header className="glass no-print top-navbar" style={{
-        height: '64px',
+        minHeight: 'calc(64px + env(safe-area-inset-top, 0px))',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 24px',
         borderRadius: 0,
         borderLeft: 'none',
         borderRight: 'none',
