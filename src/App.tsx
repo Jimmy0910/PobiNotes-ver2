@@ -294,8 +294,8 @@ export default function App() {
 
       {/* Top Navbar */}
       <header className="glass no-print top-navbar" style={{
-        minHeight: 'calc(64px + env(safe-area-inset-top, 0px))',
-        paddingTop: 'env(safe-area-inset-top, 0px)',
+        minHeight: 'calc(64px + var(--top-navbar-padding-top, env(safe-area-inset-top, 0px)))',
+        paddingTop: 'var(--top-navbar-padding-top, env(safe-area-inset-top, 0px))',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

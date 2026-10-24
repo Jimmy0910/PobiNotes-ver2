@@ -359,16 +359,21 @@ export default function ExportPDF({ mistakeIds, onBack, onImageClick }: ExportPD
             )}
           </button>
 
-          {/* 原生列印按鈕 (保留備用) */}
-          <button
-            className="btn btn-secondary"
-            onClick={handlePrint}
-            disabled={mistakes.length === 0}
-            title="開啟瀏覽器原生列印視窗"
-            style={{ padding: '8px 12px' }}
-          >
-            <Printer size={15} /> 原生列印
-          </button>
+          {/* 原生列印按鈕 (保留備用，標註無法使用請切換成建立pdf) */}
+          <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={handlePrint}
+              disabled={mistakes.length === 0}
+              title="原生列印 (無法使用請切換成建立pdf)"
+              style={{ padding: '8px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Printer size={15} /> 原生列印
+            </button>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              *無法使用請切換成建立pdf
+            </span>
+          </div>
         </div>
       </div>
 
