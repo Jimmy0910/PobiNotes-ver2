@@ -1,4 +1,4 @@
-import { ensureSchemaAndUserDefaults } from './_dbInit';
+import { ensureSchemaAndUserDefaults, isMasteryField } from './_dbInit';
 
 interface Env {
   DB: D1Database;
@@ -168,10 +168,18 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
         parsedData = m.data ? JSON.parse(m.data) : { questionData: {}, answerData: {} };
       } catch {}
 
-      let parsedTemplateFields = defaultTemplateFields;
+      let parsedTemplateFields: any = defaultTemplateFields;
       try {
         if (m.template_fields) {
           parsedTemplateFields = JSON.parse(m.template_fields);
+          if (parsedTemplateFields && typeof parsedTemplateFields === 'object') {
+            if (Array.isArray(parsedTemplateFields.answerFields)) {
+              parsedTemplateFields.answerFields = parsedTemplateFields.answerFields.filter((f: any) => !isMasteryField(f));
+            }
+            if (Array.isArray(parsedTemplateFields.questionFields)) {
+              parsedTemplateFields.questionFields = parsedTemplateFields.questionFields.filter((f: any) => !isMasteryField(f));
+            }
+          }
         }
       } catch {}
 

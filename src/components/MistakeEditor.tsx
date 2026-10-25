@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { apiRequest } from '../utils/api';
 import { compressImage } from '../utils/compress';
 import type { CategoriesBundle, Field, FieldOption, MistakeRecord } from '../types';
-import { getEffectiveFamiliarityId } from '../types';
+import { getEffectiveFamiliarityId, isLegacyMasteryField } from '../types';
 import { Save, X, Image as ImageIcon, Loader2, Tag, Plus } from 'lucide-react';
 
 interface Template {
@@ -140,9 +140,11 @@ export default function MistakeEditor({
         const normalized = (res || []).filter(Boolean).map((t: any) => ({
           ...t,
           fields: {
-            questionFields: (t.fields?.questionFields || []).map(normalizeField),
+            questionFields: (t.fields?.questionFields || [])
+              .filter((f: any) => !isLegacyMasteryField(f))
+              .map(normalizeField),
             answerFields: (t.fields?.answerFields || [])
-              .filter((f: any) => f.id !== 'a_mastery' && !f.label?.includes('掌握度'))
+              .filter((f: any) => !isLegacyMasteryField(f))
               .map(normalizeField)
           }
         }));
@@ -156,6 +158,13 @@ export default function MistakeEditor({
             setQuestionData(mistake.data?.questionData || {});
             const cleanAnsData = { ...(mistake.data?.answerData || {}) };
             delete cleanAnsData.a_mastery;
+            for (const [k, v] of Object.entries(cleanAnsData)) {
+              if (typeof v === 'string' && ['順', '卡', '不會', '誤解', '會'].includes(v.trim())) {
+                delete cleanAnsData[k];
+              } else if (Array.isArray(v) && v.length > 0 && v.every(it => typeof it === 'string' && ['順', '卡', '不會', '誤解', '會'].includes(it.trim()))) {
+                delete cleanAnsData[k];
+              }
+            }
             setAnswerData(cleanAnsData);
           }
         } else if (normalized.length > 0) {

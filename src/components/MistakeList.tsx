@@ -6,7 +6,8 @@ import {
   type FieldOption,
   type MistakeRecord,
   formatPct,
-  getEffectiveFamiliarityName
+  getEffectiveFamiliarityName,
+  isLegacyMasteryField
 } from '../types';
 import {
   Plus,
@@ -125,8 +126,12 @@ export default function MistakeList({
       const normalized = (res || []).map((m: any) => ({
         ...m,
         template_fields: {
-          questionFields: (m.template_fields?.questionFields || []).map(normalizeField),
-          answerFields: (m.template_fields?.answerFields || []).map(normalizeField)
+          questionFields: (m.template_fields?.questionFields || [])
+            .filter((f: any) => !isLegacyMasteryField(f))
+            .map(normalizeField),
+          answerFields: (m.template_fields?.answerFields || [])
+            .filter((f: any) => !isLegacyMasteryField(f))
+            .map(normalizeField)
         }
       }));
       setMistakes(normalized);

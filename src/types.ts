@@ -187,6 +187,35 @@ export function getEffectiveFamiliarityId(m: MistakeRecord, familiarities: Categ
   return null;
 }
 
+export function isLegacyMasteryField(f: any): boolean {
+  if (!f || typeof f !== 'object') return false;
+  const idLower = String(f.id || '').toLowerCase();
+  const label = String(f.label || '');
+  if (
+    idLower === 'a_mastery' ||
+    idLower.includes('mastery') ||
+    idLower.includes('fam') ||
+    label.includes('掌握') ||
+    label.includes('熟悉') ||
+    label.includes('熟練') ||
+    label.includes('難易')
+  ) {
+    return true;
+  }
+  if (
+    Array.isArray(f.options) &&
+    f.options.length > 0 &&
+    f.options.some((o: any) =>
+      ['順', '卡', '不會', '誤解', '會'].includes(
+        typeof o === 'string' ? o.trim() : String(o?.value || '').trim()
+      )
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export const DEFAULT_TEMPLATE_FIELDS: {
   questionFields: Field[];
   answerFields: Field[];

@@ -1,3 +1,5 @@
+import { ensureSchemaAndUserDefaults, isMasteryField } from './_dbInit';
+
 interface Env {
   DB: D1Database;
 }
@@ -12,14 +14,27 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
     const { env, data } = context;
     const userId = data.user!.id;
 
+    await ensureSchemaAndUserDefaults(env.DB, userId);
+
     const templates = await env.DB.prepare('SELECT * FROM templates WHERE user_id = ? ORDER BY created_at DESC')
       .bind(userId)
       .all();
 
-    let results = templates.results.map((t: any) => ({
-      ...t,
-      fields: JSON.parse(t.fields)
-    }));
+    let results = templates.results.map((t: any) => {
+      const parsedFields = JSON.parse(t.fields);
+      if (parsedFields && typeof parsedFields === 'object') {
+        if (Array.isArray(parsedFields.answerFields)) {
+          parsedFields.answerFields = parsedFields.answerFields.filter((f: any) => !isMasteryField(f));
+        }
+        if (Array.isArray(parsedFields.questionFields)) {
+          parsedFields.questionFields = parsedFields.questionFields.filter((f: any) => !isMasteryField(f));
+        }
+      }
+      return {
+        ...t,
+        fields: parsedFields
+      };
+    });
 
     if (results.length === 0) {
       const defaultId = crypto.randomUUID();

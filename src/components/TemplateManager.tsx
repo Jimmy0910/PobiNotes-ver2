@@ -1,5 +1,6 @@
 import React, { Component, useState, useEffect } from 'react';
 import { apiRequest } from '../utils/api';
+import { isLegacyMasteryField } from '../types';
 import { Plus, Trash2, ArrowUp, ArrowDown, Save, List } from 'lucide-react';
 
 interface FieldOption {
@@ -127,8 +128,16 @@ function TemplateManager() {
     if (!tpl) return;
     setSelectedTemplateId(tpl.id || null);
     setTemplateName(tpl.name || '');
-    setQuestionFields((tpl.fields?.questionFields || []).map(normalizeField));
-    setAnswerFields((tpl.fields?.answerFields || []).map(normalizeField));
+    setQuestionFields(
+      (tpl.fields?.questionFields || [])
+        .filter((f: any) => !isLegacyMasteryField(f))
+        .map(normalizeField)
+    );
+    setAnswerFields(
+      (tpl.fields?.answerFields || [])
+        .filter((f: any) => !isLegacyMasteryField(f))
+        .map(normalizeField)
+    );
   };
 
   const handleCreateNew = () => {
