@@ -38,19 +38,6 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
             styleType: 'underline',
             inline: true,
             hideLabel: false
-          },
-          {
-            id: 'a_mastery',
-            type: 'options',
-            label: '掌握度',
-            options: [
-              { value: '順', color: 'success' },
-              { value: '卡', color: 'warning' },
-              { value: '不會', color: 'danger' },
-              { value: '誤解', color: 'danger' }
-            ],
-            inline: true,
-            hideLabel: true
           }
         ]
       };

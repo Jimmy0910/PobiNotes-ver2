@@ -197,7 +197,6 @@ export const DEFAULT_TEMPLATE_FIELDS: {
     { id: 'q_source', label: '題目來源 (如：112學測)', type: 'text' }
   ],
   answerFields: [
-    { id: 'a_mastery', label: '掌握度', type: 'options' },
     { id: 'a_ans', label: '正確答案与詳解文字', type: 'textarea' },
     { id: 'a_img', label: '詳解圖片', type: 'image' },
     { id: 'a_note', label: '個人筆記 / 破題關鍵', type: 'textarea' }

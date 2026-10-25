@@ -141,7 +141,9 @@ export default function MistakeEditor({
           ...t,
           fields: {
             questionFields: (t.fields?.questionFields || []).map(normalizeField),
-            answerFields: (t.fields?.answerFields || []).map(normalizeField)
+            answerFields: (t.fields?.answerFields || [])
+              .filter((f: any) => f.id !== 'a_mastery' && !f.label?.includes('掌握度'))
+              .map(normalizeField)
           }
         }));
         setTemplates(normalized);
@@ -152,7 +154,9 @@ export default function MistakeEditor({
           if (tpl) {
             setSelectedTemplate(tpl);
             setQuestionData(mistake.data?.questionData || {});
-            setAnswerData(mistake.data?.answerData || {});
+            const cleanAnsData = { ...(mistake.data?.answerData || {}) };
+            delete cleanAnsData.a_mastery;
+            setAnswerData(cleanAnsData);
           }
         } else if (normalized.length > 0) {
           setSelectedTemplateId(normalized[0].id || '');
@@ -345,27 +349,10 @@ export default function MistakeEditor({
     const nextFId = familiarityId === fId ? '' : fId;
     setFamiliarityId(nextFId);
 
-    // Two-way sync to template fields in answerData:
-    const famObj = categories.familiarities.find(f => f.id === nextFId);
-    const famName = famObj ? famObj.name : null;
-
+    // Keep answerData clean from legacy mastery field
     setAnswerData(prev => {
       const next = { ...prev };
-      if (selectedTemplate?.fields.answerFields) {
-        for (const field of selectedTemplate.fields.answerFields) {
-          if (
-            field.id.includes('mastery') ||
-            field.label?.includes('掌握') ||
-            field.label?.includes('熟悉') ||
-            (Array.isArray(field.options) && field.options.some(o => ['順', '卡', '不會', '誤解'].includes(o.value)))
-          ) {
-            next[field.id] = famName ? [famName] : [];
-          }
-        }
-      }
-      if (next.a_mastery !== undefined || !selectedTemplate) {
-        next.a_mastery = famName ? [famName] : [];
-      }
+      delete next.a_mastery;
       return next;
     });
   };

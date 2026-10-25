@@ -207,12 +207,27 @@ export async function healMistakeFamiliarities(db: D1Database, userId: string): 
       famNameToId['會'] = famNameToId['順'];
     }
 
-    // 2. Fetch templates to discover any custom fields for mastery/familiarity
+    // 2. Fetch templates and strip legacy a_mastery / 掌握度 from answerFields
     const tplsRes = await db.prepare(`SELECT id, fields FROM templates WHERE user_id = ?`).bind(userId).all();
     const customFamFieldIds = new Set<string>();
     for (const t of (tplsRes.results || []) as any[]) {
       try {
         const fields = JSON.parse(t.fields || '{}');
+        let changed = false;
+        if (Array.isArray(fields.answerFields)) {
+          const origLen = fields.answerFields.length;
+          fields.answerFields = fields.answerFields.filter((f: any) => f.id !== 'a_mastery' && !f.label?.includes('掌握度'));
+          if (fields.answerFields.length !== origLen) changed = true;
+        }
+        if (Array.isArray(fields.questionFields)) {
+          const origLen = fields.questionFields.length;
+          fields.questionFields = fields.questionFields.filter((f: any) => f.id !== 'a_mastery' && !f.label?.includes('掌握度'));
+          if (fields.questionFields.length !== origLen) changed = true;
+        }
+        if (changed) {
+          await db.prepare(`UPDATE templates SET fields = ? WHERE id = ?`).bind(JSON.stringify(fields), t.id).run();
+        }
+
         const allFields = [...(fields.questionFields || []), ...(fields.answerFields || [])];
         for (const f of allFields) {
           const l = f.label || '';
@@ -224,6 +239,7 @@ export async function healMistakeFamiliarities(db: D1Database, userId: string): 
         }
       } catch {}
     }
+    customFamFieldIds.add('a_mastery');
 
     // 3. Query all mistakes that belong to this user or are linked through chapters/subjects
     const mistakesToRepair = await db.prepare(`
@@ -236,7 +252,10 @@ export async function healMistakeFamiliarities(db: D1Database, userId: string): 
 
     for (const m of (mistakesToRepair.results || []) as any[]) {
       let targetFamId = m.familiarity_id;
-      if (!targetFamId && m.data) {
+      let newDataStr: string | null = null;
+      let dataModified = false;
+
+      if (m.data) {
         try {
           const parsed = JSON.parse(m.data);
           const sections = [parsed.answerData, parsed.questionData, parsed];
@@ -315,18 +334,35 @@ export async function healMistakeFamiliarities(db: D1Database, userId: string): 
           if (foundName) {
             targetFamId = famNameToId[foundName] || (foundName === '會' ? famNameToId['順'] : null);
           }
+
+          // Strip legacy a_mastery from answerData and root data
+          if (parsed && typeof parsed === 'object') {
+            if (parsed.answerData && typeof parsed.answerData === 'object' && parsed.answerData.a_mastery !== undefined) {
+              delete parsed.answerData.a_mastery;
+              dataModified = true;
+            }
+            if (parsed.a_mastery !== undefined) {
+              delete parsed.a_mastery;
+              dataModified = true;
+            }
+            if (dataModified) {
+              newDataStr = JSON.stringify(parsed);
+            }
+          }
         } catch {}
       }
 
       const nextSubjectId = m.subject_id || m.chap_subject_id || null;
-      if (m.user_id !== userId || m.subject_id !== nextSubjectId || (targetFamId && m.familiarity_id !== targetFamId)) {
+      const effectiveFamId = targetFamId || m.familiarity_id || null;
+      if (m.user_id !== userId || m.subject_id !== nextSubjectId || m.familiarity_id !== effectiveFamId || newDataStr) {
         await db.prepare(
           `UPDATE mistakes
            SET user_id = ?,
                subject_id = COALESCE(subject_id, ?),
-               familiarity_id = COALESCE(familiarity_id, ?)
+               familiarity_id = ?,
+               data = COALESCE(?, data)
            WHERE id = ?`
-        ).bind(userId, nextSubjectId, targetFamId || null, m.id).run();
+        ).bind(userId, nextSubjectId, effectiveFamId, newDataStr, m.id).run();
       }
     }
   } catch (e) {

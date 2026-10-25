@@ -345,13 +345,12 @@ export const onRequestPost: PagesFunction<Env, any, UserContext> = async (contex
     const parsedDataObj = typeof mistakeData === 'string' ? JSON.parse(mistakeData) : mistakeData;
     const resolvedFamiliarityId: string | null = await resolveFamiliarityIdFromData(env.DB, userId, familiarityId, parsedDataObj);
 
-    if (resolvedFamiliarityId && parsedDataObj?.answerData) {
-      const famRow = await env.DB.prepare(
-        `SELECT name FROM categories WHERE id = ? AND user_id = ?`
-      ).bind(resolvedFamiliarityId, userId).first() as any;
-      if (famRow) {
-        parsedDataObj.answerData.a_mastery = [famRow.name];
+    // Clean up legacy a_mastery from answerData and root data so answer section is clean
+    if (parsedDataObj && typeof parsedDataObj === 'object') {
+      if (parsedDataObj.answerData && typeof parsedDataObj.answerData === 'object') {
+        delete parsedDataObj.answerData.a_mastery;
       }
+      delete parsedDataObj.a_mastery;
     }
 
     const id = crypto.randomUUID();
@@ -482,11 +481,12 @@ export const onRequestPut: PagesFunction<Env, any, UserContext> = async (context
     const nextTags = tags !== undefined ? JSON.stringify(Array.isArray(tags) ? tags : []) : (existing.tags || '[]');
     const nextMistakeDate = mistakeDate !== undefined ? mistakeDate : (existing.mistake_date || new Date(existing.created_at).toISOString().slice(0, 10));
 
-    if (nextFamiliarityId && parsedDataObj?.answerData) {
-      const famRow = await env.DB.prepare(`SELECT name FROM categories WHERE id = ? AND user_id = ?`).bind(nextFamiliarityId, userId).first() as any;
-      if (famRow) {
-        parsedDataObj.answerData.a_mastery = [famRow.name];
+    // Clean up legacy a_mastery from answerData and root data so answer section is clean
+    if (parsedDataObj && typeof parsedDataObj === 'object') {
+      if (parsedDataObj.answerData && typeof parsedDataObj.answerData === 'object') {
+        delete parsedDataObj.answerData.a_mastery;
       }
+      delete parsedDataObj.a_mastery;
     }
 
     const dataStr = JSON.stringify(parsedDataObj);
