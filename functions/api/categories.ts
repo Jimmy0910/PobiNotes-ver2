@@ -46,7 +46,7 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
         `SELECT * FROM categories WHERE user_id = ? ORDER BY sort_order ASC, created_at ASC`
       ).bind(userId).all(),
       env.DB.prepare(
-        `SELECT m.id, m.subject_id, m.chapter_id, m.unit_id, m.familiarity_id, m.error_reason_ids, c.subject_id as chap_subject_id
+        `SELECT m.id, m.subject_id, m.chapter_id, m.unit_id, m.familiarity_id, m.error_reason_ids, m.data, c.subject_id as chap_subject_id
          FROM mistakes m
          LEFT JOIN chapters c ON m.chapter_id = c.id
          LEFT JOIN subjects s ON COALESCE(m.subject_id, c.subject_id) = s.id
@@ -56,6 +56,17 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
         `SELECT error_reason_mode FROM user_settings WHERE user_id = ?`
       ).bind(userId).first()
     ]);
+
+    // Build familiarity name to ID map for fallback count
+    const famNameToId = new Map<string, string>();
+    for (const c of (catsRes.results || []) as any[]) {
+      if (c.dimension === 'familiarity') {
+        famNameToId.set(c.name, c.id);
+      }
+    }
+    if (famNameToId.has('順') && !famNameToId.has('會')) {
+      famNameToId.set('會', famNameToId.get('順')!);
+    }
 
     // Count mistakes per category ID
     const counts: Record<string, number> = {};
@@ -69,7 +80,34 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
       inc(effSubjectId);
       inc(m.chapter_id);
       inc(m.unit_id);
-      inc(m.familiarity_id);
+
+      let effectiveFamId = m.familiarity_id;
+      if (!effectiveFamId && m.data) {
+        try {
+          const parsed = JSON.parse(m.data);
+          const sections = [parsed.answerData, parsed.questionData, parsed];
+          for (const sec of sections) {
+            if (sec && typeof sec === 'object') {
+              for (const [, v] of Object.entries(sec)) {
+                if (typeof v === 'string' && famNameToId.has(v.trim())) {
+                  effectiveFamId = famNameToId.get(v.trim())!;
+                  break;
+                } else if (Array.isArray(v)) {
+                  for (const item of v) {
+                    if (typeof item === 'string' && famNameToId.has(item.trim())) {
+                      effectiveFamId = famNameToId.get(item.trim())!;
+                      break;
+                    }
+                  }
+                }
+                if (effectiveFamId) break;
+              }
+              if (effectiveFamId) break;
+            }
+          }
+        } catch {}
+      }
+      inc(effectiveFamId);
       if (m.error_reason_ids) {
         try {
           const arr = JSON.parse(m.error_reason_ids);

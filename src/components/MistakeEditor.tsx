@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { apiRequest } from '../utils/api';
 import { compressImage } from '../utils/compress';
 import type { CategoriesBundle, Field, FieldOption, MistakeRecord } from '../types';
+import { getEffectiveFamiliarityId } from '../types';
 import { Save, X, Image as ImageIcon, Loader2, Tag, Plus } from 'lucide-react';
 
 interface Template {
@@ -108,7 +109,8 @@ export default function MistakeEditor({
       setSubjectId(mistake.subject_id || '');
       setSelectedChapterId(mistake.chapter_id || '');
       setUnitId(mistake.unit_id || '');
-      setFamiliarityId(mistake.familiarity_id || '');
+      const effFamId = mistake.familiarity_id || getEffectiveFamiliarityId(mistake, categories.familiarities) || '';
+      setFamiliarityId(effFamId);
       setErrorReasonIds(Array.isArray(mistake.error_reason_ids) ? mistake.error_reason_ids : []);
       setTags(Array.isArray(mistake.tags) ? mistake.tags : []);
     } else {
@@ -128,7 +130,7 @@ export default function MistakeEditor({
       setTags([]);
       setMistakeDate(new Date().toISOString().slice(0, 10));
     }
-  }, [mistake, initialSubjectId, chapterId, initialUnitId, categories.chapters]);
+  }, [mistake, initialSubjectId, chapterId, initialUnitId, categories.chapters, categories.familiarities]);
 
   // Fetch templates
   useEffect(() => {
@@ -324,6 +326,48 @@ export default function MistakeEditor({
     } else {
       setAnswerData(prev => ({ ...prev, [fieldId]: nextOptions }));
     }
+
+    // Two-way synchronization: If this field is a mastery/familiarity field or option is a standard familiarity name
+    const optTrimmed = option.trim();
+    const matchingFam = categories.familiarities.find(
+      f => f.name === optTrimmed || (optTrimmed === '會' && f.name === '順')
+    );
+    if (matchingFam) {
+      if (nextOptions.includes(option)) {
+        setFamiliarityId(matchingFam.id);
+      } else if (familiarityId === matchingFam.id) {
+        setFamiliarityId('');
+      }
+    }
+  };
+
+  const handleFamiliaritySelect = (fId: string) => {
+    const nextFId = familiarityId === fId ? '' : fId;
+    setFamiliarityId(nextFId);
+
+    // Two-way sync to template fields in answerData:
+    const famObj = categories.familiarities.find(f => f.id === nextFId);
+    const famName = famObj ? famObj.name : null;
+
+    setAnswerData(prev => {
+      const next = { ...prev };
+      if (selectedTemplate?.fields.answerFields) {
+        for (const field of selectedTemplate.fields.answerFields) {
+          if (
+            field.id.includes('mastery') ||
+            field.label?.includes('掌握') ||
+            field.label?.includes('熟悉') ||
+            (Array.isArray(field.options) && field.options.some(o => ['順', '卡', '不會', '誤解'].includes(o.value)))
+          ) {
+            next[field.id] = famName ? [famName] : [];
+          }
+        }
+      }
+      if (next.a_mastery !== undefined || !selectedTemplate) {
+        next.a_mastery = famName ? [famName] : [];
+      }
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -554,7 +598,7 @@ export default function MistakeEditor({
                         <button
                           key={f.id}
                           type="button"
-                          onClick={() => setFamiliarityId(active ? '' : f.id)}
+                          onClick={() => handleFamiliaritySelect(active ? '' : f.id)}
                           style={{
                             padding: '5px 12px',
                             borderRadius: '14px',

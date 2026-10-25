@@ -148,8 +148,171 @@ export async function ensureSchemaAndUserDefaults(db: D1Database, userId?: strin
     schemaChecked = true;
   }
 
+// Intelligent self-healing function to extract familiarity and backfill mistakes across all subjects
+export async function healMistakeFamiliarities(db: D1Database, userId: string): Promise<void> {
+  try {
+    // 1. Fetch user familiarities
+    const famsRes = await db.prepare(
+      `SELECT id, name FROM categories WHERE user_id = ? AND dimension = 'familiarity'`
+    ).bind(userId).all();
+
+    const famNameToId: Record<string, string> = {};
+    if (!famsRes.results || famsRes.results.length === 0) {
+      const defaultFamiliarity = [
+        { name: '順', color: 'success', order: 10 },
+        { name: '卡', color: 'warning', order: 20 },
+        { name: '不會', color: 'danger', order: 30 },
+        { name: '誤解', color: 'danger', order: 40 }
+      ];
+      const now = Date.now();
+      for (const item of defaultFamiliarity) {
+        const id = crypto.randomUUID();
+        famNameToId[item.name] = id;
+        await db.prepare(
+          `INSERT INTO categories (id, user_id, dimension, parent_id, name, color, sort_order, is_active, created_at, updated_at)
+           VALUES (?, ?, 'familiarity', NULL, ?, ?, ?, 1, ?, ?)`
+        ).bind(id, userId, item.name, item.color, item.order, now, now).run();
+      }
+    } else {
+      for (const f of (famsRes.results || []) as any[]) {
+        famNameToId[f.name] = f.id;
+      }
+    }
+    if (famNameToId['順'] && !famNameToId['會']) {
+      famNameToId['會'] = famNameToId['順'];
+    }
+
+    // 2. Fetch templates to discover any custom fields for mastery/familiarity
+    const tplsRes = await db.prepare(`SELECT id, fields FROM templates WHERE user_id = ?`).bind(userId).all();
+    const customFamFieldIds = new Set<string>();
+    for (const t of (tplsRes.results || []) as any[]) {
+      try {
+        const fields = JSON.parse(t.fields || '{}');
+        const allFields = [...(fields.questionFields || []), ...(fields.answerFields || [])];
+        for (const f of allFields) {
+          const l = f.label || '';
+          if (l.includes('掌握') || l.includes('熟悉') || l.includes('熟練') || l.includes('難易') || f.id.includes('mastery') || f.id.includes('fam')) {
+            customFamFieldIds.add(f.id);
+          } else if (Array.isArray(f.options) && f.options.some((o: any) => ['順', '卡', '不會', '誤解', '會'].includes(typeof o === 'string' ? o : o?.value))) {
+            customFamFieldIds.add(f.id);
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Query all mistakes that belong to this user or are linked through chapters/subjects
+    const mistakesToRepair = await db.prepare(`
+      SELECT m.id, m.user_id, m.subject_id, m.chapter_id, m.familiarity_id, m.template_id, m.data, c.subject_id as chap_subject_id
+      FROM mistakes m
+      LEFT JOIN chapters c ON m.chapter_id = c.id
+      LEFT JOIN subjects s ON COALESCE(m.subject_id, c.subject_id) = s.id
+      WHERE (m.user_id = ? OR s.user_id = ? OR m.user_id IS NULL)
+    `).bind(userId, userId).all();
+
+    for (const m of (mistakesToRepair.results || []) as any[]) {
+      let targetFamId = m.familiarity_id;
+      if (!targetFamId && m.data) {
+        try {
+          const parsed = JSON.parse(m.data);
+          const sections = [parsed.answerData, parsed.questionData, parsed];
+          let foundName: string | null = null;
+
+          // Check custom template fields first
+          for (const sec of sections) {
+            if (sec && typeof sec === 'object') {
+              for (const fid of customFamFieldIds) {
+                if (sec[fid] !== undefined) {
+                  const val = sec[fid];
+                  if (typeof val === 'string' && famNameToId[val.trim()]) {
+                    foundName = val.trim();
+                    break;
+                  } else if (Array.isArray(val)) {
+                    for (const item of val) {
+                      if (typeof item === 'string' && famNameToId[item.trim()]) {
+                        foundName = item.trim();
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+              if (foundName) break;
+            }
+          }
+
+          // Check keys with mastery / fam
+          if (!foundName) {
+            for (const sec of sections) {
+              if (sec && typeof sec === 'object') {
+                for (const [k, v] of Object.entries(sec)) {
+                  const kLower = k.toLowerCase();
+                  if (kLower.includes('mastery') || kLower.includes('fam') || k.includes('掌握') || k.includes('熟悉')) {
+                    if (typeof v === 'string' && famNameToId[v.trim()]) {
+                      foundName = v.trim();
+                      break;
+                    } else if (Array.isArray(v)) {
+                      for (const item of v) {
+                        if (typeof item === 'string' && famNameToId[item.trim()]) {
+                          foundName = item.trim();
+                          break;
+                        }
+                      }
+                    }
+                  }
+                }
+                if (foundName) break;
+              }
+            }
+          }
+
+          // Scan all entries for any familiarity value
+          if (!foundName) {
+            for (const sec of sections) {
+              if (sec && typeof sec === 'object') {
+                for (const [, v] of Object.entries(sec)) {
+                  if (typeof v === 'string' && famNameToId[v.trim()]) {
+                    foundName = v.trim();
+                    break;
+                  } else if (Array.isArray(v)) {
+                    for (const item of v) {
+                      if (typeof item === 'string' && famNameToId[item.trim()]) {
+                        foundName = item.trim();
+                        break;
+                      }
+                    }
+                  }
+                }
+                if (foundName) break;
+              }
+            }
+          }
+
+          if (foundName) {
+            targetFamId = famNameToId[foundName] || (foundName === '會' ? famNameToId['順'] : null);
+          }
+        } catch {}
+      }
+
+      const nextSubjectId = m.subject_id || m.chap_subject_id || null;
+      if (m.user_id !== userId || m.subject_id !== nextSubjectId || (targetFamId && m.familiarity_id !== targetFamId)) {
+        await db.prepare(
+          `UPDATE mistakes
+           SET user_id = ?,
+               subject_id = COALESCE(subject_id, ?),
+               familiarity_id = COALESCE(familiarity_id, ?)
+           WHERE id = ?`
+        ).bind(userId, nextSubjectId, targetFamId || null, m.id).run();
+      }
+    }
+  } catch (e) {
+    console.error('Error in healMistakeFamiliarities:', e);
+  }
+}
+
   // 4. Seed initial user categories & migrate legacy mastery values if needed
   if (userId) {
+    // Run self-healing routine on every user request to guarantee all subjects have familiarity linked
+    await healMistakeFamiliarities(db, userId);
     // Auto deduplicate and merge duplicate categories for this user (e.g. repeated familiarity or error reasons)
     try {
       const userCats = await db.prepare(

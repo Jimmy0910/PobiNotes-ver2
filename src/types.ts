@@ -119,20 +119,59 @@ export function getEffectiveFamiliarityName(m: MistakeRecord, familiarities: Cat
   }
   if (m.familiarity_name) return m.familiarity_name;
 
-  // Fallback to legacy template field if any
-  const values: string[] = [];
-  for (const sec of [m.data?.answerData, m.data?.questionData]) {
+  if (!m.data) return null;
+
+  // Build a set of known familiarity names for fast lookup
+  const validFamNames = new Set(familiarities.map(f => f.name));
+  validFamNames.add('順');
+  validFamNames.add('卡');
+  validFamNames.add('不會');
+  validFamNames.add('誤解');
+  validFamNames.add('會'); // legacy synonym for 順
+
+  const extractFromValue = (v: any): string | null => {
+    if (typeof v === 'string') {
+      const trimmed = v.trim();
+      if (validFamNames.has(trimmed)) {
+        return trimmed === '會' ? '順' : trimmed;
+      }
+    } else if (Array.isArray(v)) {
+      for (const item of v) {
+        if (typeof item === 'string' && validFamNames.has(item.trim())) {
+          return item.trim() === '會' ? '順' : item.trim();
+        }
+      }
+    } else if (v && typeof v === 'object' && typeof v.value === 'string' && validFamNames.has(v.value.trim())) {
+      return v.value.trim() === '會' ? '順' : v.value.trim();
+    }
+    return null;
+  };
+
+  const sections = [m.data?.answerData, m.data?.questionData, m.data];
+
+  // 1. Prioritize keys containing mastery, familiarity, fam, 掌握度, 熟悉度
+  for (const sec of sections) {
     if (sec && typeof sec === 'object') {
       for (const [k, v] of Object.entries(sec)) {
-        if (k.includes('mastery') && Array.isArray(v)) {
-          values.push(...v);
+        const kLower = k.toLowerCase();
+        if (kLower.includes('mastery') || kLower.includes('fam') || k.includes('掌握') || k.includes('熟悉') || k.includes('難易')) {
+          const match = extractFromValue(v);
+          if (match) return match;
         }
       }
     }
   }
-  if (values.length > 0) {
-    return values[0] === '會' ? '順' : values[0];
+
+  // 2. Scan all entries in sections for any valid familiarity value
+  for (const sec of sections) {
+    if (sec && typeof sec === 'object') {
+      for (const [, v] of Object.entries(sec)) {
+        const match = extractFromValue(v);
+        if (match) return match;
+      }
+    }
   }
+
   return null;
 }
 

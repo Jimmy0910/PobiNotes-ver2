@@ -8,6 +8,75 @@ interface UserContext {
   user?: { id: string; username: string };
 }
 
+// Helper to smartly extract familiarity ID from mistakeData across all subject templates
+async function resolveFamiliarityIdFromData(
+  db: D1Database,
+  userId: string,
+  explicitFamId: string | null | undefined,
+  mistakeData: any
+): Promise<string | null> {
+  if (explicitFamId) return explicitFamId;
+  if (!mistakeData) return null;
+
+  try {
+    const famsRes = await db.prepare(
+      `SELECT id, name FROM categories WHERE user_id = ? AND dimension = 'familiarity'`
+    ).bind(userId).all();
+    const famMap = new Map<string, string>();
+    for (const f of (famsRes.results || []) as any[]) {
+      famMap.set(f.name, f.id);
+    }
+    if (famMap.has('順') && !famMap.has('會')) {
+      famMap.set('會', famMap.get('順')!);
+    }
+
+    const parsed = typeof mistakeData === 'string' ? JSON.parse(mistakeData) : mistakeData;
+    const sections = [parsed.answerData, parsed.questionData, parsed];
+
+    const matchVal = (v: any): string | null => {
+      if (typeof v === 'string' && famMap.has(v.trim())) {
+        return famMap.get(v.trim())!;
+      }
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (typeof item === 'string' && famMap.has(item.trim())) {
+            return famMap.get(item.trim())!;
+          }
+        }
+      }
+      if (v && typeof v === 'object' && typeof v.value === 'string' && famMap.has(v.value.trim())) {
+        return famMap.get(v.value.trim())!;
+      }
+      return null;
+    };
+
+    // 1. Check keys related to mastery or familiarity
+    for (const sec of sections) {
+      if (sec && typeof sec === 'object') {
+        for (const [k, v] of Object.entries(sec)) {
+          const kLower = k.toLowerCase();
+          if (kLower.includes('mastery') || kLower.includes('fam') || k.includes('掌握') || k.includes('熟悉') || k.includes('難易')) {
+            const m = matchVal(v);
+            if (m) return m;
+          }
+        }
+      }
+    }
+
+    // 2. Scan all entries for any standard familiarity value
+    for (const sec of sections) {
+      if (sec && typeof sec === 'object') {
+        for (const [, v] of Object.entries(sec)) {
+          const m = matchVal(v);
+          if (m) return m;
+        }
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
 // GET /api/mistakes - List mistakes for the user (including uncategorized mistakes)
 export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context) => {
   try {
@@ -27,6 +96,20 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
     const reasonMap = new Map<string, { id: string; name: string; color: string; is_active: number }>();
     for (const r of (reasonsRes.results || []) as any[]) {
       reasonMap.set(r.id, r);
+    }
+
+    // Fetch familiarities for this user
+    const famsRes = await env.DB.prepare(
+      `SELECT id, name, color, is_active FROM categories WHERE user_id = ? AND dimension = 'familiarity'`
+    ).bind(userId).all();
+    const famMap = new Map<string, { id: string; name: string; color: string; is_active: number }>();
+    const famNameToObj = new Map<string, { id: string; name: string; color: string; is_active: number }>();
+    for (const f of (famsRes.results || []) as any[]) {
+      famMap.set(f.id, f);
+      famNameToObj.set(f.name, f);
+    }
+    if (famNameToObj.has('順') && !famNameToObj.has('會')) {
+      famNameToObj.set('會', famNameToObj.get('順')!);
     }
 
     let query = `
@@ -114,12 +197,52 @@ export const onRequestGet: PagesFunction<Env, any, UserContext> = async (context
 
       const mistakeDate = m.mistake_date || new Date(m.created_at).toISOString().slice(0, 10);
 
+      let effFamId = m.familiarity_id || null;
+      let effFamName = m.familiarity_name || null;
+      let effFamColor = m.familiarity_color || null;
+      let effFamIsActive = m.familiarity_is_active ?? null;
+
+      // Smart fallback to discover familiarity if not directly joined
+      if (!effFamId && parsedData) {
+        const sections = [parsedData.answerData, parsedData.questionData, parsedData];
+        for (const sec of sections) {
+          if (sec && typeof sec === 'object') {
+            for (const [, v] of Object.entries(sec)) {
+              if (typeof v === 'string' && famNameToObj.has(v.trim())) {
+                const matched = famNameToObj.get(v.trim())!;
+                effFamId = matched.id;
+                effFamName = matched.name;
+                effFamColor = matched.color;
+                effFamIsActive = matched.is_active;
+                break;
+              } else if (Array.isArray(v)) {
+                for (const it of v) {
+                  if (typeof it === 'string' && famNameToObj.has(it.trim())) {
+                    const matched = famNameToObj.get(it.trim())!;
+                    effFamId = matched.id;
+                    effFamName = matched.name;
+                    effFamColor = matched.color;
+                    effFamIsActive = matched.is_active;
+                    break;
+                  }
+                }
+              }
+              if (effFamId) break;
+            }
+            if (effFamId) break;
+          }
+        }
+      }
+
       return {
         ...m,
         subject_id: m.effective_subject_id || null,
         chapter_id: m.chapter_id || null,
         unit_id: m.unit_id || null,
-        familiarity_id: m.familiarity_id || null,
+        familiarity_id: effFamId,
+        familiarity_name: effFamName,
+        familiarity_color: effFamColor,
+        familiarity_is_active: effFamIsActive,
         error_reason_ids: errorReasonIds,
         error_reason_items: errorReasonItems,
         error_reason_names: errorReasonItems.map((item: any) => item.name),
@@ -218,29 +341,11 @@ export const onRequestPost: PagesFunction<Env, any, UserContext> = async (contex
       resolvedTemplateId = firstTpl?.id || 'default';
     }
 
-    // Resolve familiarityId: if not explicitly sent, check if mistakeData has legacy a_mastery
-    let resolvedFamiliarityId: string | null = familiarityId || null;
+    // Resolve familiarityId: if not explicitly sent, check if mistakeData has legacy or template mastery values
     const parsedDataObj = typeof mistakeData === 'string' ? JSON.parse(mistakeData) : mistakeData;
+    const resolvedFamiliarityId: string | null = await resolveFamiliarityIdFromData(env.DB, userId, familiarityId, parsedDataObj);
 
-    if (!resolvedFamiliarityId && parsedDataObj) {
-      const masteryVals: string[] = [];
-      for (const sec of [parsedDataObj.answerData, parsedDataObj.questionData]) {
-        if (sec && typeof sec === 'object') {
-          for (const [k, v] of Object.entries(sec)) {
-            if (k.includes('mastery') && Array.isArray(v) && v.length > 0) {
-              masteryVals.push(...(v as string[]));
-            }
-          }
-        }
-      }
-      if (masteryVals.length > 0) {
-        const targetName = masteryVals[0] === '會' ? '順' : masteryVals[0];
-        const famRow = await env.DB.prepare(
-          `SELECT id FROM categories WHERE user_id = ? AND dimension = 'familiarity' AND name = ? LIMIT 1`
-        ).bind(userId, targetName).first() as any;
-        if (famRow) resolvedFamiliarityId = famRow.id;
-      }
-    } else if (resolvedFamiliarityId && parsedDataObj?.answerData) {
+    if (resolvedFamiliarityId && parsedDataObj?.answerData) {
       const famRow = await env.DB.prepare(
         `SELECT name FROM categories WHERE id = ? AND user_id = ?`
       ).bind(resolvedFamiliarityId, userId).first() as any;
@@ -367,12 +472,16 @@ export const onRequestPut: PagesFunction<Env, any, UserContext> = async (context
       }
     }
 
-    const nextFamiliarityId = familiarityId !== undefined ? (familiarityId || null) : existing.familiarity_id;
+    const parsedDataObj = typeof mistakeData === 'string' ? JSON.parse(mistakeData) : mistakeData;
+    let nextFamiliarityId = familiarityId !== undefined ? (familiarityId || null) : existing.familiarity_id;
+    if (!nextFamiliarityId && parsedDataObj) {
+      nextFamiliarityId = await resolveFamiliarityIdFromData(env.DB, userId, null, parsedDataObj) || existing.familiarity_id;
+    }
+
     const nextErrorReasonIds = errorReasonIds !== undefined ? JSON.stringify(Array.isArray(errorReasonIds) ? errorReasonIds : []) : (existing.error_reason_ids || '[]');
     const nextTags = tags !== undefined ? JSON.stringify(Array.isArray(tags) ? tags : []) : (existing.tags || '[]');
     const nextMistakeDate = mistakeDate !== undefined ? mistakeDate : (existing.mistake_date || new Date(existing.created_at).toISOString().slice(0, 10));
 
-    const parsedDataObj = typeof mistakeData === 'string' ? JSON.parse(mistakeData) : mistakeData;
     if (nextFamiliarityId && parsedDataObj?.answerData) {
       const famRow = await env.DB.prepare(`SELECT name FROM categories WHERE id = ? AND user_id = ?`).bind(nextFamiliarityId, userId).first() as any;
       if (famRow) {
