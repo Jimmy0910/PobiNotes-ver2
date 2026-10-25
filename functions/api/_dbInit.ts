@@ -151,21 +151,33 @@ export async function ensureSchemaAndUserDefaults(db: D1Database, userId?: strin
 // Intelligent self-healing function to extract familiarity and backfill mistakes across all subjects
 export async function healMistakeFamiliarities(db: D1Database, userId: string): Promise<void> {
   try {
-    // 1. Fetch user familiarities
+    // 1. Fetch user familiarities and enforce EXACTLY the 4 standard ones: 順, 卡, 不會, 誤解
     const famsRes = await db.prepare(
       `SELECT id, name FROM categories WHERE user_id = ? AND dimension = 'familiarity'`
     ).bind(userId).all();
 
+    const standardNames = ['順', '卡', '不會', '誤解'];
     const famNameToId: Record<string, string> = {};
-    if (!famsRes.results || famsRes.results.length === 0) {
-      const defaultFamiliarity = [
-        { name: '順', color: 'success', order: 10 },
-        { name: '卡', color: 'warning', order: 20 },
-        { name: '不會', color: 'danger', order: 30 },
-        { name: '誤解', color: 'danger', order: 40 }
-      ];
-      const now = Date.now();
-      for (const item of defaultFamiliarity) {
+    const nonStandardFams: Array<{ id: string; name: string }> = [];
+
+    for (const f of (famsRes.results || []) as any[]) {
+      if (standardNames.includes(f.name)) {
+        famNameToId[f.name] = f.id;
+      } else {
+        nonStandardFams.push({ id: f.id, name: f.name });
+      }
+    }
+
+    // Ensure all 4 standard familiarities exist
+    const defaultFamiliarity = [
+      { name: '順', color: 'success', order: 10 },
+      { name: '卡', color: 'warning', order: 20 },
+      { name: '不會', color: 'danger', order: 30 },
+      { name: '誤解', color: 'danger', order: 40 }
+    ];
+    const now = Date.now();
+    for (const item of defaultFamiliarity) {
+      if (!famNameToId[item.name]) {
         const id = crypto.randomUUID();
         famNameToId[item.name] = id;
         await db.prepare(
@@ -173,11 +185,24 @@ export async function healMistakeFamiliarities(db: D1Database, userId: string): 
            VALUES (?, ?, 'familiarity', NULL, ?, ?, ?, 1, ?, ?)`
         ).bind(id, userId, item.name, item.color, item.order, now, now).run();
       }
-    } else {
-      for (const f of (famsRes.results || []) as any[]) {
-        famNameToId[f.name] = f.id;
+    }
+
+    // Clean up non-standard familiarities and reassign mistakes
+    if (nonStandardFams.length > 0) {
+      for (const nonStd of nonStandardFams) {
+        // Map non-standard to '順' if positive, else '卡'
+        const targetId = (nonStd.name.includes('精通') || nonStd.name.includes('熟') || nonStd.name.includes('會'))
+          ? famNameToId['順']
+          : famNameToId['卡'];
+        await db.prepare(
+          `UPDATE mistakes SET familiarity_id = ? WHERE familiarity_id = ? AND user_id = ?`
+        ).bind(targetId, nonStd.id, userId).run();
+        await db.prepare(
+          `DELETE FROM categories WHERE id = ? AND user_id = ?`
+        ).bind(nonStd.id, userId).run();
       }
     }
+
     if (famNameToId['順'] && !famNameToId['會']) {
       famNameToId['會'] = famNameToId['順'];
     }

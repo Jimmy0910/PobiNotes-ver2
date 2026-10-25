@@ -340,13 +340,20 @@ export const onRequestPost: PagesFunction<Env, any, UserContext> = async (contex
       }), { status: 201, headers: { 'Content-Type': 'application/json' } });
     }
 
-    if (dimension === 'familiarity' || dimension === 'error_reason') {
+    if (dimension === 'familiarity') {
+      return new Response(JSON.stringify({ error: '熟悉度為系統固定核心維度（順、卡、不會、誤解），不開放自訂新增' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (dimension === 'error_reason') {
       const maxRow = await env.DB.prepare(`SELECT MAX(sort_order) as max_order FROM categories WHERE user_id = ? AND dimension = ?`).bind(userId, dimension).first() as any;
       const finalOrder = typeof sortOrder === 'number' ? sortOrder : ((maxRow?.max_order ?? 0) + 10);
 
       let resolvedSubjectId: string | null = null;
       const cleanParentId = parentId ? String(parentId).trim() : null;
-      if (dimension === 'error_reason' && cleanParentId) {
+      if (cleanParentId) {
         const chap = await env.DB.prepare(`SELECT subject_id FROM chapters WHERE id = ?`).bind(cleanParentId).first() as any;
         if (chap) {
           resolvedSubjectId = chap.subject_id;
@@ -636,6 +643,16 @@ export const onRequestDelete: PagesFunction<Env, any, UserContext> = async (cont
       }
       await env.DB.prepare(`DELETE FROM units WHERE id = ? AND user_id = ?`).bind(id, userId).run();
     } else if (dimension === 'familiarity') {
+      const existingFam = await env.DB.prepare(
+        `SELECT name FROM categories WHERE id = ? AND dimension = 'familiarity' AND user_id = ?`
+      ).bind(id, userId).first() as any;
+      if (existingFam && ['順', '卡', '不會', '誤解'].includes(existingFam.name)) {
+        return new Response(JSON.stringify({ error: '系統核心熟悉度（順、卡、不會、誤解）不可刪除' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       if (mode === 'purge') {
         await env.DB.prepare(`DELETE FROM mistakes WHERE familiarity_id = ? AND user_id = ?`).bind(id, userId).run();
       } else {

@@ -18,7 +18,9 @@ import {
   Power,
   AlertTriangle,
   GripVertical,
-  ExternalLink
+  ExternalLink,
+  Lock,
+  CheckCircle2
 } from 'lucide-react';
 
 interface CategoryManagerProps {
@@ -506,135 +508,154 @@ export default function CategoryManager({
           )}
         </div>
 
-        {/* Add Category Form */}
-        <form onSubmit={handleCreate} style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '10px',
-          alignItems: 'center',
-          paddingTop: '12px',
-          borderTop: '1px solid var(--glass-border)'
-        }}>
-          {activeDim === 'chapter' && (
-            <select
-              className="input"
-              style={{ width: 'auto', minWidth: '160px', padding: '8px 12px', fontSize: '0.9rem' }}
-              value={newParentSubjectId || (parentSubjectFilter !== 'ALL' ? parentSubjectFilter : (categories.subjects[0]?.id || ''))}
-              onChange={e => setNewParentSubjectId(e.target.value)}
-              data-testid="new-category-parent-subject"
-            >
-              <option value="" disabled>選擇所屬科目</option>
-              {categories.subjects.map(s => (
-                <option key={s.id} value={s.id}>科目：{s.name}</option>
-              ))}
-            </select>
-          )}
-
-          {activeDim === 'unit' && (
-            <>
+        {/* Add Category Form or Familiarity Locked Notice */}
+        {activeDim === 'familiarity' ? (
+          <div style={{
+            padding: '14px 18px',
+            borderRadius: 'var(--radius-md)',
+            background: 'rgba(0, 31, 101, 0.05)',
+            border: '1px solid rgba(0, 31, 101, 0.16)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginTop: '8px'
+          }}>
+            <CheckCircle2 size={20} style={{ color: 'var(--success)', flexShrink: 0 }} />
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              <strong style={{ color: 'var(--text-primary)' }}>系統核心標準熟悉度：</strong>
+              系統預設且固定為 4 個核心維度（<strong>順</strong>、<strong>卡</strong>、<strong>不會</strong>、<strong>誤解</strong>），所有題目、自訂模板與章節統計已標準化統一。使用者不可自訂新增或刪除，確保全科跨章節分析標準一致。
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleCreate} style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px',
+            alignItems: 'center',
+            paddingTop: '12px',
+            borderTop: '1px solid var(--glass-border)'
+          }}>
+            {activeDim === 'chapter' && (
               <select
                 className="input"
-                style={{ width: 'auto', minWidth: '150px', padding: '8px 12px', fontSize: '0.9rem' }}
-                value={newParentSubjectId || (parentSubjectFilter !== 'ALL' ? parentSubjectFilter : '')}
-                onChange={e => {
-                  setNewParentSubjectId(e.target.value);
-                  setNewParentChapterId('');
-                }}
-                data-testid="new-unit-parent-subject"
+                style={{ width: 'auto', minWidth: '160px', padding: '8px 12px', fontSize: '0.9rem' }}
+                value={newParentSubjectId || (parentSubjectFilter !== 'ALL' ? parentSubjectFilter : (categories.subjects[0]?.id || ''))}
+                onChange={e => setNewParentSubjectId(e.target.value)}
+                data-testid="new-category-parent-subject"
               >
-                <option value="">全部科目</option>
+                <option value="" disabled>選擇所屬科目</option>
                 {categories.subjects.map(s => (
                   <option key={s.id} value={s.id}>科目：{s.name}</option>
                 ))}
               </select>
+            )}
 
-              <select
-                className="input"
-                style={{ width: 'auto', minWidth: '170px', padding: '8px 12px', fontSize: '0.9rem' }}
-                value={newParentChapterId || (parentChapterFilter !== 'ALL' ? parentChapterFilter : '')}
-                onChange={e => setNewParentChapterId(e.target.value)}
-                data-testid="new-unit-parent-chapter"
-              >
-                <option value="">-- 請選擇所屬章節 --</option>
-                {availableChaptersForUnitCreate.map(c => {
-                  const subj = categories.subjects.find(s => s.id === c.parent_id);
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {subj ? `${subj.name} / ` : ''}{c.name}
-                    </option>
-                  );
-                })}
-              </select>
-            </>
-          )}
-
-          {activeDim === 'error_reason' && (
-            <>
-              <select
-                className="input"
-                style={{ width: 'auto', minWidth: '155px', padding: '8px 12px', fontSize: '0.88rem' }}
-                value={newParentSubjectId}
-                onChange={e => {
-                  setNewParentSubjectId(e.target.value);
-                  setNewParentChapterId('');
-                }}
-                data-testid="new-error-reason-subject"
-              >
-                <option value="">全科目通用錯因</option>
-                {categories.subjects.map(s => (
-                  <option key={s.id} value={s.id}>專屬科目：{s.name}</option>
-                ))}
-              </select>
-
-              <select
-                className="input"
-                style={{ width: 'auto', minWidth: '170px', padding: '8px 12px', fontSize: '0.88rem' }}
-                value={newParentChapterId}
-                onChange={e => setNewParentChapterId(e.target.value)}
-                disabled={!newParentSubjectId}
-                data-testid="new-error-reason-chapter"
-              >
-                <option value="">{newParentSubjectId ? '-- 該科目全章節通用 --' : '-- 先選科目可指定章節 --'}</option>
-                {categories.chapters
-                  .filter(c => c.parent_id === newParentSubjectId)
-                  .map(c => (
-                    <option key={c.id} value={c.id}>專屬章節：{c.name}</option>
+            {activeDim === 'unit' && (
+              <>
+                <select
+                  className="input"
+                  style={{ width: 'auto', minWidth: '150px', padding: '8px 12px', fontSize: '0.9rem' }}
+                  value={newParentSubjectId || (parentSubjectFilter !== 'ALL' ? parentSubjectFilter : '')}
+                  onChange={e => {
+                    setNewParentSubjectId(e.target.value);
+                    setNewParentChapterId('');
+                  }}
+                  data-testid="new-unit-parent-subject"
+                >
+                  <option value="">全部科目</option>
+                  {categories.subjects.map(s => (
+                    <option key={s.id} value={s.id}>科目：{s.name}</option>
                   ))}
-              </select>
-            </>
-          )}
+                </select>
 
-          <input
-            type="text"
-            className="input"
-            style={{ flex: 1, minWidth: '200px', padding: '8px 14px', fontSize: '0.9rem' }}
-            placeholder={`輸入新${DIMENSION_META.find(d => d.key === activeDim)?.label.slice(3)}名稱...`}
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            data-testid="new-category-name-input"
-          />
+                <select
+                  className="input"
+                  style={{ width: 'auto', minWidth: '170px', padding: '8px 12px', fontSize: '0.9rem' }}
+                  value={newParentChapterId || (parentChapterFilter !== 'ALL' ? parentChapterFilter : '')}
+                  onChange={e => setNewParentChapterId(e.target.value)}
+                  data-testid="new-unit-parent-chapter"
+                >
+                  <option value="">-- 請選擇所屬章節 --</option>
+                  {availableChaptersForUnitCreate.map(c => {
+                    const subj = categories.subjects.find(s => s.id === c.parent_id);
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {subj ? `${subj.name} / ` : ''}{c.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </>
+            )}
 
-          <select
-            className="input"
-            style={{ width: 'auto', minWidth: '130px', padding: '8px 12px', fontSize: '0.88rem' }}
-            value={newColor}
-            onChange={e => setNewColor(e.target.value)}
-          >
-            {COLOR_OPTIONS.map(c => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
+            {activeDim === 'error_reason' && (
+              <>
+                <select
+                  className="input"
+                  style={{ width: 'auto', minWidth: '155px', padding: '8px 12px', fontSize: '0.88rem' }}
+                  value={newParentSubjectId}
+                  onChange={e => {
+                    setNewParentSubjectId(e.target.value);
+                    setNewParentChapterId('');
+                  }}
+                  data-testid="new-error-reason-subject"
+                >
+                  <option value="">全科目通用錯因</option>
+                  {categories.subjects.map(s => (
+                    <option key={s.id} value={s.id}>專屬科目：{s.name}</option>
+                  ))}
+                </select>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ padding: '8px 18px', fontSize: '0.9rem' }}
-            disabled={submitting}
-            data-testid="add-category-submit-btn"
-          >
-            <Plus size={16} /> 新增分類
-          </button>
-        </form>
+                <select
+                  className="input"
+                  style={{ width: 'auto', minWidth: '170px', padding: '8px 12px', fontSize: '0.88rem' }}
+                  value={newParentChapterId}
+                  onChange={e => setNewParentChapterId(e.target.value)}
+                  disabled={!newParentSubjectId}
+                  data-testid="new-error-reason-chapter"
+                >
+                  <option value="">{newParentSubjectId ? '-- 該科目全章節通用 --' : '-- 先選科目可指定章節 --'}</option>
+                  {categories.chapters
+                    .filter(c => c.parent_id === newParentSubjectId)
+                    .map(c => (
+                      <option key={c.id} value={c.id}>專屬章節：{c.name}</option>
+                    ))}
+                </select>
+              </>
+            )}
+
+            <input
+              type="text"
+              className="input"
+              style={{ flex: 1, minWidth: '200px', padding: '8px 14px', fontSize: '0.9rem' }}
+              placeholder={`輸入新${DIMENSION_META.find(d => d.key === activeDim)?.label.slice(3)}名稱...`}
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              data-testid="new-category-name-input"
+            />
+
+            <select
+              className="input"
+              style={{ width: 'auto', minWidth: '130px', padding: '8px 12px', fontSize: '0.88rem' }}
+              value={newColor}
+              onChange={e => setNewColor(e.target.value)}
+            >
+              {COLOR_OPTIONS.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ padding: '8px 18px', fontSize: '0.9rem' }}
+              disabled={submitting}
+              data-testid="add-category-submit-btn"
+            >
+              <Plus size={16} /> 新增分類
+            </button>
+          </form>
+        )}
 
         {/* Category Table */}
         <div style={{ overflowX: 'auto', marginTop: '4px' }}>
@@ -701,10 +722,22 @@ export default function CategoryManager({
                           <input
                             type="text"
                             className="input"
-                            style={{ width: '160px', padding: '4px 8px', fontSize: '0.88rem' }}
+                            style={{
+                              width: '160px',
+                              padding: '4px 8px',
+                              fontSize: '0.88rem',
+                              opacity: item.dimension === 'familiarity' ? 0.7 : 1,
+                              cursor: item.dimension === 'familiarity' ? 'not-allowed' : 'text'
+                            }}
                             value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            autoFocus
+                            onChange={e => {
+                              if (item.dimension !== 'familiarity') {
+                                setEditName(e.target.value);
+                              }
+                            }}
+                            readOnly={item.dimension === 'familiarity'}
+                            title={item.dimension === 'familiarity' ? '核心熟悉度名稱已鎖定，不可更名' : undefined}
+                            autoFocus={item.dimension !== 'familiarity'}
                           />
                           <select
                             className="input"
@@ -842,34 +875,51 @@ export default function CategoryManager({
                           </button>
                         </div>
                       ) : (
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
+                        <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
                           <button
                             type="button"
                             className="btn btn-secondary"
                             style={{ padding: '5px 9px', fontSize: '0.78rem' }}
                             onClick={() => startEditing(item)}
-                            title="重新命名或編輯"
+                            title={item.dimension === 'familiarity' ? '調整熟悉度代表顏色' : '重新命名或編輯'}
                           >
-                            <Edit2 size={13} /> 編輯
+                            <Edit2 size={13} /> {item.dimension === 'familiarity' ? '調色' : '編輯'}
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ padding: '5px 9px', fontSize: '0.78rem', color: item.is_active === 1 ? 'var(--warning)' : 'var(--success)' }}
-                            onClick={() => handleToggleActive(item)}
-                            title={item.is_active === 1 ? '停用分類' : '啟用分類'}
-                          >
-                            <Power size={13} /> {item.is_active === 1 ? '停用' : '啟用'}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ padding: '5px 9px', fontSize: '0.78rem', color: 'var(--danger)' }}
-                            onClick={() => openDeleteModal(item)}
-                            title="刪除分類"
-                          >
-                            <Trash2 size={13} /> 刪除
-                          </button>
+                          {item.dimension === 'familiarity' ? (
+                            <span style={{
+                              fontSize: '0.75rem',
+                              color: 'var(--text-muted)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '4px 6px',
+                              background: 'var(--glass-bg)',
+                              borderRadius: '4px'
+                            }}>
+                              <Lock size={12} /> 核心鎖定
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                style={{ padding: '5px 9px', fontSize: '0.78rem', color: item.is_active === 1 ? 'var(--warning)' : 'var(--success)' }}
+                                onClick={() => handleToggleActive(item)}
+                                title={item.is_active === 1 ? '停用分類' : '啟用分類'}
+                              >
+                                <Power size={13} /> {item.is_active === 1 ? '停用' : '啟用'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                style={{ padding: '5px 9px', fontSize: '0.78rem', color: 'var(--danger)' }}
+                                onClick={() => openDeleteModal(item)}
+                                title="刪除分類"
+                              >
+                                <Trash2 size={13} /> 刪除
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </td>

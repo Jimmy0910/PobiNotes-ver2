@@ -20,7 +20,9 @@ import {
   Square,
   RefreshCw,
   Sparkles,
-  Layers
+  Layers,
+  Tag,
+  BarChart3
 } from 'lucide-react';
 import MistakeEditor from './MistakeEditor';
 
@@ -245,6 +247,21 @@ export default function MistakeList({
     return categories.units.filter(u => u.parent_id === chapterId && u.is_active === 1);
   }, [categories.units, chapterId]);
 
+  const currentChapter = useMemo(() => {
+    if (!chapterId) return null;
+    return categories.chapters.find(c => c.id === chapterId) || null;
+  }, [categories.chapters, chapterId]);
+
+  const currentSubject = useMemo(() => {
+    if (currentChapter?.parent_id) {
+      return categories.subjects.find(s => s.id === currentChapter.parent_id) || null;
+    }
+    if (subjectId) {
+      return categories.subjects.find(s => s.id === subjectId) || null;
+    }
+    return null;
+  }, [categories.subjects, currentChapter, subjectId]);
+
   // Available units for the search dropdown (filtered by selected subject if chosen)
   const availableFilterUnits = useMemo(() => {
     const subjectChapterIds = filterSubjectId
@@ -402,6 +419,58 @@ export default function MistakeList({
     categories.subjects,
     categories.errorReasons
   ]);
+
+  // Chapter familiarity percentage breakdown
+  const chapterFamiliarityStats = useMemo(() => {
+    const total = filteredMistakes.length;
+    if (total === 0) return { total: 0, masteryRate: 0, famCounts: {} as Record<string, number> };
+    const famCounts: Record<string, number> = {};
+    for (const fam of deduplicatedFamiliarities) {
+      famCounts[fam.name] = filteredMistakes.filter(
+        m => getEffectiveFamiliarityName(m, categories.familiarities) === fam.name
+      ).length;
+    }
+    const smoothCount = (famCounts['順'] || 0);
+    const masteryRate = Math.round((smoothCount / total) * 100);
+    return { total, masteryRate, famCounts };
+  }, [filteredMistakes, deduplicatedFamiliarities, categories.familiarities]);
+
+  // Breakdown of Error Reasons for current list (chapter or global)
+  const errorReasonBreakdown = useMemo(() => {
+    if (filteredMistakes.length === 0) return [];
+    const countMap = new Map<string, { id: string; name: string; count: number; color?: string }>();
+    let untaggedCount = 0;
+
+    for (const m of filteredMistakes) {
+      const rIds: string[] = m.error_reason_ids || [];
+      if (rIds.length === 0) {
+        untaggedCount++;
+      } else {
+        for (const rid of rIds) {
+          const rObj = categories.errorReasons.find(r => r.id === rid);
+          const rName = rObj?.name || '其他錯因';
+          const existing = countMap.get(rid) || { id: rid, name: rName, count: 0, color: rObj?.color };
+          existing.count++;
+          countMap.set(rid, existing);
+        }
+      }
+    }
+
+    const list = Array.from(countMap.values()).sort((a, b) => b.count - a.count);
+    if (untaggedCount > 0) {
+      list.push({ id: '__untagged__', name: '未標記錯因', count: untaggedCount, color: 'default' });
+    }
+    return list;
+  }, [filteredMistakes, categories.errorReasons]);
+
+  const handleToggleReasonFilter = (reasonId: string) => {
+    if (reasonId === '__untagged__') return;
+    if (filterErrorReasonId === reasonId) {
+      setFilterErrorReasonId('');
+    } else {
+      setFilterErrorReasonId(reasonId);
+    }
+  };
 
   return (
     <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
@@ -781,6 +850,125 @@ export default function MistakeList({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Chapter Breakdown Panel: Familiarity Progress Bar + Error Reasons Distribution */}
+      {filteredMistakes.length > 0 && (
+        <div className="glass no-print animate-fade-in" style={{ padding: '18px 22px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BarChart3 size={18} style={{ color: 'var(--accent-primary)' }} />
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {chapterId && currentChapter
+                  ? `${currentSubject ? `【${currentSubject.name}】` : ''}${currentChapter.name} 專屬掌握度與錯因統計`
+                  : '當前視圖錯因與熟悉度掌握分佈統計'}
+              </h3>
+            </div>
+            <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+              順暢掌握度：<strong style={{ color: '#197A27', fontSize: '0.95rem' }}>{chapterFamiliarityStats.masteryRate}%</strong>
+              （{chapterFamiliarityStats.famCounts['順'] || 0} / {chapterFamiliarityStats.total} 題）
+            </div>
+          </div>
+
+          {/* Familiarity Visual Stacked Bar */}
+          <div style={{
+            height: '10px',
+            borderRadius: '6px',
+            overflow: 'hidden',
+            display: 'flex',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--glass-border)'
+          }}>
+            {deduplicatedFamiliarities.map(fam => {
+              const count = chapterFamiliarityStats.famCounts[fam.name] || 0;
+              if (count === 0) return null;
+              const pct = (count / chapterFamiliarityStats.total) * 100;
+              const bg = fam.color === 'success' ? '#197A27' : fam.color === 'warning' ? '#D97706' : fam.color === 'danger' ? '#C5221F' : 'var(--accent-primary)';
+              return (
+                <div
+                  key={fam.name}
+                  style={{ width: `${pct}%`, background: bg, transition: 'width 0.3s ease' }}
+                  title={`${fam.name}: ${count} 題 (${pct.toFixed(1)}%)`}
+                />
+              );
+            })}
+          </div>
+
+          {/* Error Reasons Distribution Grid */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--glass-border)', paddingTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Tag size={14} style={{ color: 'var(--accent-secondary)' }} />
+                <span>各錯因統計與涉及率（點擊錯因標籤可快速篩選）：</span>
+              </span>
+              {filterErrorReasonId && (
+                <button
+                  type="button"
+                  className="btn btn-text"
+                  style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', padding: '2px 6px' }}
+                  onClick={() => setFilterErrorReasonId('')}
+                >
+                  清除錯因篩選
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+              {errorReasonBreakdown.map(item => {
+                const isSelected = filterErrorReasonId === item.id;
+                const isUntagged = item.id === '__untagged__';
+                const ratePct = ((item.count / filteredMistakes.length) * 100).toFixed(0);
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleToggleReasonFilter(item.id)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: isSelected ? 'rgba(0, 31, 101, 0.12)' : 'var(--bg-secondary)',
+                      border: isSelected ? '1.5px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                      cursor: isUntagged ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                    title={isUntagged ? undefined : (isSelected ? '點擊取消篩選' : '點擊快速篩選此錯因')}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{
+                        fontSize: '0.84rem',
+                        fontWeight: isSelected ? 700 : 500,
+                        color: isSelected ? 'var(--accent-primary)' : (isUntagged ? 'var(--text-muted)' : 'var(--text-primary)')
+                      }}>
+                        {item.name}
+                      </span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: isSelected ? 'var(--accent-primary)' : 'var(--text-secondary)' }}>
+                        {item.count} 題 <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>({ratePct}%)</span>
+                      </span>
+                    </div>
+
+                    {/* Mini Progress Bar */}
+                    <div style={{ width: '100%', height: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${ratePct}%`,
+                        height: '100%',
+                        background: isSelected ? 'var(--accent-primary)' : 'var(--accent-secondary)',
+                        borderRadius: '2px'
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {errorReasonBreakdown.length === 0 && (
+                <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', padding: '6px 0' }}>
+                  本範圍內尚無題目標記錯因。
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
